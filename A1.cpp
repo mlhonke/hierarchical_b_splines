@@ -22,7 +22,7 @@ A1::A1()
 }
 
 void A1::initSurface(){
-	surface = new HBSurface(npx, npy, 2);
+	surface = new HBSurface(npx, npy, 4);
 }
 
 //----------------------------------------------------------------------------------------
@@ -48,10 +48,13 @@ void A1::init()
 	m_shader.link();
 
 	// Set up the uniforms
-	P_uni = m_shader.getUniformLocation( "P" );
-	V_uni = m_shader.getUniformLocation( "V" );
-	M_uni = m_shader.getUniformLocation( "M" );
-	col_uni = m_shader.getUniformLocation( "colour" );
+	P_uni = m_shader.getUniformLocation( "Perspective" );
+	M_uni = m_shader.getUniformLocation( "ModelView" );
+
+	//Set up lighting
+	light_position = m_shader.getUniformLocation("light.position");
+	light_colour = m_shader.getUniformLocation("light.rgbIntensity");
+	light_ambient = m_shader.getUniformLocation("ambientIntensity");
 
 	//Initialize the vertex buffers
 	initBuffers();
@@ -79,18 +82,19 @@ void A1::init()
 void A1::initBuffers()
 {
 	GLuint vaos[1];
-	GLuint vbos[1];
+	GLuint vbos[2];
 
 	// Create the vertex array to record buffer assignments.
 	glGenVertexArrays( 1, vaos );
 
 	// Create the buffer.
-	glGenBuffers( 1, vbos );
+	glGenBuffers( 2, vbos );
 
 	//Assign vertex arrays and buffers to named variables for easier tracking.
 	m_surface_vao = vaos[0];
 
 	m_surface_vbo = vbos[0];
+	m_surface_normals_vbo = vbos[1];
 }
 
 /*
@@ -98,14 +102,20 @@ initSurface: Updates the surface vertices in the buffer.
 */
 void A1::updateSurface(){
 	glBindVertexArray(m_surface_vao);
+
+	//Position data
 	glBindBuffer(GL_ARRAY_BUFFER, m_surface_vbo);
-
-	//TODO: Figure out size of buffer. Eg. 24*3*sizeof(float)
 	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_vertices(), GL_DYNAMIC_DRAW);
-
 	GLint posAttrib2 = m_shader.getAttribLocation( "position" );
 	glEnableVertexAttribArray( posAttrib2 );
 	glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+
+	//Normal data
+	glBindBuffer(GL_ARRAY_BUFFER, m_surface_normals_vbo);
+	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_normals(), GL_DYNAMIC_DRAW);
+	GLint m_normalAttribLocation = m_shader.getAttribLocation("normal");
+	glEnableVertexAttribArray(m_normalAttribLocation);
+	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
 	glBindVertexArray( 0 );
 	glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -190,14 +200,41 @@ void A1::draw()
 	m_shader.enable();
 		glEnable( GL_DEPTH_TEST );
 		glEnable( GL_CULL_FACE );
+		glfwSwapInterval(1);
 
 		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
-		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
+		W = view * W;
 		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
+		GLint location = m_shader.getUniformLocation("NormalMatrix");
+		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(W)));
+		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
+		CHECK_GL_ERRORS;
+
+		// Lighting
+		glm::vec3 lpos(0.0f, 10.0f, 0.0f);
+		glUniform3fv(light_position, 1, value_ptr(lpos));
+		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
+		glUniform3fv(light_colour, 1, value_ptr(lcol));
+		glm::vec3 lamb(0.1f);
+		glUniform3fv(light_ambient, 1, value_ptr(lamb));
+		CHECK_GL_ERRORS;
+
+		// Set Material values:
+		location = m_shader.getUniformLocation("material.kd");
+		glm::vec3 kd(0.5f, 0.7f, 0.5f);
+		glUniform3fv(location, 1, value_ptr(kd));
+		CHECK_GL_ERRORS;
+		location = m_shader.getUniformLocation("material.ks");
+		glm::vec3 ks(0.8f, 0.8f, 0.8f);
+		glUniform3fv(location, 1, value_ptr(ks));
+		CHECK_GL_ERRORS;
+		location = m_shader.getUniformLocation("material.shininess");
+		float sh = 100.0f;
+		glUniform1f(location, sh);
+		CHECK_GL_ERRORS;
 
 		// Draw the surface.
 		glBindVertexArray( m_surface_vao );
-		glUniform3f( col_uni, 0.3, 0.6, 0.3);
 		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_vertices());
 
 	m_shader.disable();

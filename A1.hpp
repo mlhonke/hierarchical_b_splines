@@ -34,8 +34,8 @@ private:
 	void updateSurface();
 
 	// Fields related to surface properties
-	int npx = 2;
-	int npy = 2;
+	int npx = 4;
+	int npy = 4;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;
@@ -48,6 +48,7 @@ private:
 	HBSurface* surface;
 	GLuint m_surface_vao; // Vertex Array Object
 	GLuint m_surface_vbo; // Vertex Buffer Object
+	GLuint m_surface_normals_vbo;
 
 	// Fields related to movement.
 	bool dragging;
@@ -59,4 +60,8 @@ private:
 	// Matrices controlling the camera and projection.
 	glm::mat4 proj;
 	glm::mat4 view;
+
+	GLint light_position;
+	GLint light_colour;
+	GLint light_ambient;
 };

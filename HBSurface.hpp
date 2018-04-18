@@ -8,6 +8,7 @@ class HBSurface {
 public:
     HBSurface(int npx, int npy, int res);
     glm::vec3* get_vertices();
+    glm::vec3* get_normals();
     unsigned int get_vertices_size();
     unsigned int get_n_vertices();
 
@@ -20,6 +21,7 @@ private:
     int npy;
     int res;
     glm::vec3* Pbuffer;
+    glm::vec3* Nbuffer;
     int npatches;
     int ncpx;
     int ncpy;
@@ -30,6 +32,7 @@ private:
     Eigen::MatrixXf* cpsz;
     Eigen::Matrix4f B;
     glm::vec3* vert;
+    glm::vec3* norm;
     unsigned int nvert = 0;
     bool refined = true;
 };

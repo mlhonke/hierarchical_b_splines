@@ -2,6 +2,7 @@
 
 HBSurface::HBSurface(int npx, int npy, int res):npx(npx), npy(npy), res(res){
     Pbuffer = new glm::vec3[(res+1)*(res+1)];
+    Nbuffer = new glm::vec3[(res+1)*(res+1)];
     npatches = npx*npy;
     int m = npx + k - 2;
     int n = npy + l - 2;
@@ -16,7 +17,7 @@ HBSurface::HBSurface(int npx, int npy, int res):npx(npx), npy(npy), res(res){
     for(int i = 0; i<ncpx; i++){
         for(int j = 0; j<ncpy; j++){
             (*cpsx)(i,j) = i;
-            (*cpsy)(i,j) = 0.1f*i*j;
+            (*cpsy)(i,j) = 0.0f*i*j;
             (*cpsz)(i,j) = j;
         }
     }
@@ -61,9 +62,11 @@ glm::vec3* HBSurface::get_vertices(){
         }
 
         vert = new glm::vec3[get_n_vertices()];
+        norm = new glm::vec3[get_n_vertices()];
     }
 
     //Iterate through the patches
+    float h = 0.0001f;
     for (int i = 0; i < npx; i++){
         for (int j = 0; j < npy; j++){
             //Iterate in the patch
@@ -71,7 +74,26 @@ glm::vec3* HBSurface::get_vertices(){
                 float u = (float) xp / (float) res;
                 for (int yp = 0; yp <= res; yp++){
                     float v = (float) yp / (float) res;
-                    Pbuffer[fxy(xp, yp)] = eval_point(i, j, u, v);
+                    glm::vec3 C = eval_point(i, j, u, v);
+                    Pbuffer[fxy(xp, yp)] =  C;
+
+                    // Find the normal
+                    glm::vec3 A;
+                    glm::vec3 B;
+                    float sign = -1.0f;
+                    if (xp == res && yp != 0){
+                        A = eval_point(i,j, u-h, v);
+                        sign *= -1.0f;
+                    } else {
+                        A = eval_point(i,j, u+h, v);
+                    }
+                    if (yp == res){
+                        B = eval_point(i,j, u, v-h);
+                        sign *= -1.0f;
+                    } else {
+                        B = eval_point(i,j, u, v+h);
+                    }
+                    Nbuffer[fxy(xp, yp)] = sign*(glm::cross(C-A, C-B));
                     //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
                 }
             }
@@ -79,13 +101,17 @@ glm::vec3* HBSurface::get_vertices(){
             for (int xp = 0; xp < res; xp++){
                 glm::vec3 P0 = Pbuffer[fxy(xp, 0)];
                 glm::vec3 P1 = Pbuffer[fxy(xp+1, 0)];
+                glm::vec3 N0 = Nbuffer[fxy(xp, 0)];
+                glm::vec3 N1 = Nbuffer[fxy(xp+1, 0)];
                 for (int yp = 0; yp < res; yp++){
                     glm::vec3 P2 = Pbuffer[fxy(xp+1, yp+1)];
                     glm::vec3 P3 = Pbuffer[fxy(xp, yp+1)];
+                    glm::vec3 N2 = Nbuffer[fxy(xp+1, yp+1)];
+                    glm::vec3 N3 = Nbuffer[fxy(xp, yp+1)];
 
                     //Find the current square element of the surface (ugly)
                     int elem = (i*npx+j)*res*res*2*3+xp*res*2*3+yp*2*3;
-                    std::cout << P0.x << " " << P0.y << " " << P0.z << std::endl;
+                    //std::cout << P0.x << " " << P0.y << " " << P0.z << std::endl;
                     vert[elem + 0] = P2;
                     vert[elem + 1] = P1;
                     vert[elem + 2] = P0;
@@ -93,15 +119,28 @@ glm::vec3* HBSurface::get_vertices(){
                     vert[elem + 4] = P3;
                     vert[elem + 5] = P2;
 
+                    norm[elem + 0] = N2;
+                    norm[elem + 1] = N1;
+                    norm[elem + 2] = N0;
+                    norm[elem + 3] = N0;
+                    norm[elem + 4] = N3;
+                    norm[elem + 5] = N2;
+
                     //Shift over a square
                     P1 = P2;
                     P0 = P3;
+                    N1 = N2;
+                    N0 = N3;
                 }
             }
         }
     }
 
     return vert;
+}
+
+glm::vec3* HBSurface::get_normals(){
+    return norm;
 }
 
 unsigned int HBSurface::fxy(int x, int y){
