@@ -8,6 +8,7 @@ HBSurface::HBSurface(int npx, int npy, int res):npx(npx), npy(npy), res(res){
     int n = npy + l - 2;
     ncpx = m + 1;
     ncpy = n + 1;
+    cp_verts = new glm::vec3[36*ncpx*ncpy];
     cpsx = new Eigen::MatrixXf(ncpx, ncpy);
     cpsy = new Eigen::MatrixXf(ncpx, ncpy);
     cpsz = new Eigen::MatrixXf(ncpx, ncpy);
@@ -16,11 +17,13 @@ HBSurface::HBSurface(int npx, int npy, int res):npx(npx), npy(npy), res(res){
     //Initialize all the control points
     for(int i = 0; i<ncpx; i++){
         for(int j = 0; j<ncpy; j++){
-            (*cpsx)(i,j) = i;
-            (*cpsy)(i,j) = 0.0f*i*j;
-            (*cpsz)(i,j) = j;
+            (*cpsx)(i,j) = i - (ncpx-1.0f)/2.0f;
+            (*cpsy)(i,j) = 0.0f;
+            (*cpsz)(i,j) = j - (ncpy-1.0f)/2.0f;
         }
     }
+
+    (*cpsy)(3,3) = 3.0f;
 
     //Initialize the BSpline operator matrix
     B <<    1, 4, 1, 0,
@@ -66,7 +69,7 @@ glm::vec3* HBSurface::get_vertices(){
     }
 
     //Iterate through the patches
-    float h = 0.0001f;
+    float h = 0.00001f;
     for (int i = 0; i < npx; i++){
         for (int j = 0; j < npy; j++){
             //Iterate in the patch
@@ -137,6 +140,32 @@ glm::vec3* HBSurface::get_vertices(){
     }
 
     return vert;
+}
+
+glm::vec3* HBSurface::get_cp_vertices(){
+    for (int i = 0; i < ncpx; i++){
+        for (int j = 0; j < ncpy; j++){
+            float x = (*cpsx)(i,j);
+            float y = (*cpsy)(i,j);
+            float z = (*cpsz)(i,j);
+            //float x,y,z;
+            //std::cout << x << " " << y << " " << z << std::endl;
+            Cube CP(x, y, z);
+            for (int k = 0; k < 36; k++){
+                cp_verts[36*(i*ncpx + j) + k] = CP.get_vertices()[k];
+            }
+        }
+    }
+
+    return cp_verts;
+}
+
+unsigned int HBSurface::get_cp_vertices_size(){
+    return 3*get_n_cp_vertices()*sizeof(float);
+}
+
+unsigned int HBSurface::get_n_cp_vertices(){
+    return 36*ncpx*ncpy;
 }
 
 glm::vec3* HBSurface::get_normals(){

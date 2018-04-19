@@ -195,7 +195,7 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
  ../Eigen/src/Eigenvalues/RealQZ.h \
  ../Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
  ../Eigen/src/Eigenvalues/./RealQZ.h \
- ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
+ ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp \
  ../../shared/cs488-framework/GlErrorCheck.hpp ../../shared/imgui/imgui.h \
  ../../shared/imgui/imconfig.h \
  ../../shared/include/glm/gtc/matrix_transform.hpp \
@@ -720,6 +720,8 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
 ../Eigen/src/Eigenvalues/./RealQZ.h:
 
 ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
+
+../cube.hpp:
 
 ../../shared/cs488-framework/GlErrorCheck.hpp:
 

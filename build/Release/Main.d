@@ -195,7 +195,7 @@ Release/Main.o: ../Main.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
  ../Eigen/src/Eigenvalues/RealQZ.h \
  ../Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
  ../Eigen/src/Eigenvalues/./RealQZ.h \
- ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h
+ ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp
 
 ../A1.hpp:
 
@@ -710,3 +710,5 @@ Release/Main.o: ../Main.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
 ../Eigen/src/Eigenvalues/./RealQZ.h:
 
 ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
+
+../cube.hpp:

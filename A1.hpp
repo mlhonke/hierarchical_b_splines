@@ -34,21 +34,28 @@ private:
 	void updateSurface();
 
 	// Fields related to surface properties
-	int npx = 4;
-	int npy = 4;
+	int npx = 8;
+	int npy = 8;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;
-	GLint P_uni; // Uniform location for Projection matrix.
-	GLint V_uni; // Uniform location for View matrix.
-	GLint M_uni; // Uniform location for Model matrix.
+	ShaderProgram b_shader;
+	GLint Pers; // Uniform location for Projection matrix.
+	GLint Model; // Uniform location for Model matrix.
+
+	GLint P_uni;
+	GLint V_uni;
+	GLint M_uni;
 	GLint col_uni;   // Uniform location for cube colour.
+	GLint posAttrib2;
 
 	// Fields related to grid geometry.
 	HBSurface* surface;
 	GLuint m_surface_vao; // Vertex Array Object
 	GLuint m_surface_vbo; // Vertex Buffer Object
 	GLuint m_surface_normals_vbo;
+	GLuint m_cp_vao;
+	GLuint m_cp_vbo;
 
 	// Fields related to movement.
 	bool dragging;
@@ -64,4 +71,10 @@ private:
 	GLint light_position;
 	GLint light_colour;
 	GLint light_ambient;
+	GLint Pos;
+	GLint m_normalAttribLocation;
+	GLint ks_location;
+	GLint kd_location;
+	GLint sh_location;
+	GLint norm_location;
 };

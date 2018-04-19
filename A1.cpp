@@ -22,7 +22,7 @@ A1::A1()
 }
 
 void A1::initSurface(){
-	surface = new HBSurface(npx, npy, 4);
+	surface = new HBSurface(npx, npy, 12);
 }
 
 //----------------------------------------------------------------------------------------
@@ -47,14 +47,33 @@ void A1::init()
 	m_shader.attachFragmentShader( getAssetFilePath( "FragmentShader.fs" ).c_str() );
 	m_shader.link();
 
+	// Build the shader
+	b_shader.generateProgramObject();
+	b_shader.attachVertexShader( getAssetFilePath( "BasicVertexShader.vs" ).c_str() );
+	b_shader.attachFragmentShader( getAssetFilePath( "BasicFragmentShader.fs" ).c_str() );
+	b_shader.link();
+
 	// Set up the uniforms
-	P_uni = m_shader.getUniformLocation( "Perspective" );
-	M_uni = m_shader.getUniformLocation( "ModelView" );
+	Pers = m_shader.getUniformLocation( "Perspective" );
+	Model = m_shader.getUniformLocation( "ModelView" );
+	Pos = m_shader.getAttribLocation( "position" );
+	m_normalAttribLocation = m_shader.getAttribLocation("normal");
+	kd_location = m_shader.getUniformLocation("material.kd");
+	ks_location = m_shader.getUniformLocation("material.ks");
+	sh_location = m_shader.getUniformLocation("material.shininess");
+	norm_location = m_shader.getUniformLocation("NormalMatrix");
 
 	//Set up lighting
 	light_position = m_shader.getUniformLocation("light.position");
 	light_colour = m_shader.getUniformLocation("light.rgbIntensity");
 	light_ambient = m_shader.getUniformLocation("ambientIntensity");
+
+	//Set up basic shader uniforms (non-phong)
+	P_uni = b_shader.getUniformLocation( "P" );
+	V_uni = b_shader.getUniformLocation( "V" );
+	M_uni = b_shader.getUniformLocation( "M" );
+	col_uni = b_shader.getUniformLocation( "colour" );
+	posAttrib2 = b_shader.getAttribLocation( "position");
 
 	//Initialize the vertex buffers
 	initBuffers();
@@ -81,20 +100,22 @@ void A1::init()
  */
 void A1::initBuffers()
 {
-	GLuint vaos[1];
-	GLuint vbos[2];
+	GLuint vaos[2];
+	GLuint vbos[3];
 
 	// Create the vertex array to record buffer assignments.
-	glGenVertexArrays( 1, vaos );
+	glGenVertexArrays( 2, vaos );
 
 	// Create the buffer.
-	glGenBuffers( 2, vbos );
+	glGenBuffers( 3, vbos );
 
 	//Assign vertex arrays and buffers to named variables for easier tracking.
 	m_surface_vao = vaos[0];
+	m_cp_vao = vaos[1];
 
 	m_surface_vbo = vbos[0];
 	m_surface_normals_vbo = vbos[1];
+	m_cp_vbo = vbos[2];
 }
 
 /*
@@ -106,16 +127,21 @@ void A1::updateSurface(){
 	//Position data
 	glBindBuffer(GL_ARRAY_BUFFER, m_surface_vbo);
 	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_vertices(), GL_DYNAMIC_DRAW);
-	GLint posAttrib2 = m_shader.getAttribLocation( "position" );
-	glEnableVertexAttribArray( posAttrib2 );
-	glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+	glEnableVertexAttribArray( Pos );
+	glVertexAttribPointer( Pos, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
 
 	//Normal data
 	glBindBuffer(GL_ARRAY_BUFFER, m_surface_normals_vbo);
 	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_normals(), GL_DYNAMIC_DRAW);
-	GLint m_normalAttribLocation = m_shader.getAttribLocation("normal");
 	glEnableVertexAttribArray(m_normalAttribLocation);
 	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+	//CP vertices
+	glBindVertexArray(m_cp_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
+	glBufferData(GL_ARRAY_BUFFER, surface->get_cp_vertices_size(), surface->get_cp_vertices(), GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray( posAttrib2 );
+	glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
 
 	glBindVertexArray( 0 );
 	glBindBuffer( GL_ARRAY_BUFFER, 0 );
@@ -195,23 +221,22 @@ void A1::draw()
 	mat4 W;
 	W = glm::rotate(W, rot_rads, vec3(0, 1, 0));
 	W = glm::scale(W, vec3(zoom, zoom, zoom));
-	W = glm::translate( W, vec3( -(1.0f + (npx+1)/2.0f), 0, -(1.0f + (npy+1)/2.0f) ) );
+	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
 
 	m_shader.enable();
 		glEnable( GL_DEPTH_TEST );
 		glEnable( GL_CULL_FACE );
 		glfwSwapInterval(1);
 
-		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
-		W = view * W;
-		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
-		GLint location = m_shader.getUniformLocation("NormalMatrix");
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(W)));
-		glUniformMatrix3fv(location, 1, GL_FALSE, value_ptr(normalMatrix));
+		glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
+		mat4 M = view * W;
+		glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
+		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
+		glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
 		CHECK_GL_ERRORS;
 
 		// Lighting
-		glm::vec3 lpos(0.0f, 10.0f, 0.0f);
+		glm::vec3 lpos(0.0f, 10.0f, 10.0f);
 		glUniform3fv(light_position, 1, value_ptr(lpos));
 		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
 		glUniform3fv(light_colour, 1, value_ptr(lcol));
@@ -220,17 +245,12 @@ void A1::draw()
 		CHECK_GL_ERRORS;
 
 		// Set Material values:
-		location = m_shader.getUniformLocation("material.kd");
 		glm::vec3 kd(0.5f, 0.7f, 0.5f);
-		glUniform3fv(location, 1, value_ptr(kd));
-		CHECK_GL_ERRORS;
-		location = m_shader.getUniformLocation("material.ks");
-		glm::vec3 ks(0.8f, 0.8f, 0.8f);
-		glUniform3fv(location, 1, value_ptr(ks));
-		CHECK_GL_ERRORS;
-		location = m_shader.getUniformLocation("material.shininess");
+		glUniform3fv(kd_location, 1, value_ptr(kd));
+		glm::vec3 ks(0.5f, 0.5f, 0.5f);
+		glUniform3fv(ks_location, 1, value_ptr(ks));
 		float sh = 100.0f;
-		glUniform1f(location, sh);
+		glUniform1f(sh_location, sh);
 		CHECK_GL_ERRORS;
 
 		// Draw the surface.
@@ -238,6 +258,16 @@ void A1::draw()
 		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_vertices());
 
 	m_shader.disable();
+
+	b_shader.enable();
+		glBindVertexArray( m_cp_vao );
+		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
+		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
+		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
+		glUniform3f( col_uni, 1, 0, 0 );
+		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_cp_vertices());
+		CHECK_GL_ERRORS;
+	b_shader.disable();
 
 	// Restore defaults
 	glBindVertexArray( 0 );

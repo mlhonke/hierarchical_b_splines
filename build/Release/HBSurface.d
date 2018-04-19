@@ -190,7 +190,7 @@ Release/HBSurface.o: ../HBSurface.cpp ../HBSurface.hpp \
  ../Eigen/src/Eigenvalues/RealQZ.h \
  ../Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
  ../Eigen/src/Eigenvalues/./RealQZ.h \
- ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h
+ ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp
 
 ../HBSurface.hpp:
 
@@ -691,3 +691,5 @@ Release/HBSurface.o: ../HBSurface.cpp ../HBSurface.hpp \
 ../Eigen/src/Eigenvalues/./RealQZ.h:
 
 ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
+
+../cube.hpp:
