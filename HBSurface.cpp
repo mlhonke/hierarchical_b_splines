@@ -8,6 +8,7 @@ HBSurface::HBSurface(int npx, int npy, int res):npx(npx), npy(npy), res(res){
     int n = npy + l - 2;
     ncpx = m + 1;
     ncpy = n + 1;
+    ncps = ncpx*ncpy;
     cp_verts = new glm::vec3[36*ncpx*ncpy];
     cpsx = new Eigen::MatrixXf(ncpx, ncpy);
     cpsy = new Eigen::MatrixXf(ncpx, ncpy);
@@ -69,7 +70,7 @@ glm::vec3* HBSurface::get_vertices(){
     }
 
     //Iterate through the patches
-    float h = 0.00001f;
+    float h = 0.001f;
     for (int i = 0; i < npx; i++){
         for (int j = 0; j < npy; j++){
             //Iterate in the patch
@@ -81,22 +82,26 @@ glm::vec3* HBSurface::get_vertices(){
                     Pbuffer[fxy(xp, yp)] =  C;
 
                     // Find the normal
-                    glm::vec3 A;
-                    glm::vec3 B;
+                    glm::vec3 A0, A1;
+                    glm::vec3 B0, B1;
                     float sign = -1.0f;
-                    if (xp == res && yp != 0){
-                        A = eval_point(i,j, u-h, v);
-                        sign *= -1.0f;
+                    if (xp == res && i != npx){
+                        A0 = eval_point(i+1,j, h, v);
+                        A1 = eval_point(i, j, u-h, v);
+                        //sign *= -1.0f;
                     } else {
-                        A = eval_point(i,j, u+h, v);
+                        A0 = eval_point(i,j, u+h, v);
+                        A1 = eval_point(i, j, u-h, v);
                     }
-                    if (yp == res){
-                        B = eval_point(i,j, u, v-h);
-                        sign *= -1.0f;
+                    if (yp == res && j != npy){
+                        B0 = eval_point(i,j+1, u, h);
+                        B1 = eval_point(i, j, u, v-h);
+                        //sign *= -1.0f;
                     } else {
-                        B = eval_point(i,j, u, v+h);
+                        B0 = eval_point(i,j, u, v+h);
+                        B1 = eval_point(i, j, u, v-h);
                     }
-                    Nbuffer[fxy(xp, yp)] = sign*(glm::cross(C-A, C-B));
+                    Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                     //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
                 }
             }
@@ -158,6 +163,27 @@ glm::vec3* HBSurface::get_cp_vertices(){
     }
 
     return cp_verts;
+}
+
+glm::vec3 HBSurface::get_cp_col(int idx){
+    if (idx == sel_idx){
+        //std::cout << "what I think is selected " << idx << std::endl;
+        return glm::vec3(1.0f, 0.0f, 0.0f);
+    } else {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
+void HBSurface::select_cp(int idx){
+    if (idx < ncps){
+        sel_idx = idx;
+        sel_cp_i = idx/ncpx;
+        sel_cp_j = idx%ncpx;
+    }
+}
+
+unsigned int HBSurface::get_n_cps(){
+    return ncps;
 }
 
 unsigned int HBSurface::get_cp_vertices_size(){

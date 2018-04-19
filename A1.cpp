@@ -22,7 +22,7 @@ A1::A1()
 }
 
 void A1::initSurface(){
-	surface = new HBSurface(npx, npy, 12);
+	surface = new HBSurface(npx, npy, 16);
 }
 
 //----------------------------------------------------------------------------------------
@@ -78,9 +78,6 @@ void A1::init()
 	//Initialize the vertex buffers
 	initBuffers();
 
-	//Initialize the B-Spline surface
-	updateSurface();
-
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
 	view = glm::lookAt(
@@ -121,7 +118,7 @@ void A1::initBuffers()
 /*
 initSurface: Updates the surface vertices in the buffer.
 */
-void A1::updateSurface(){
+void A1::updateSurface(glm::mat4 W){
 	glBindVertexArray(m_surface_vao);
 
 	//Position data
@@ -136,6 +133,53 @@ void A1::updateSurface(){
 	glEnableVertexAttribArray(m_normalAttribLocation);
 	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
+	glBindVertexArray( 0 );
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+
+	CHECK_GL_ERRORS;
+
+	m_shader.enable();
+		glEnable( GL_DEPTH_TEST );
+		glEnable( GL_CULL_FACE );
+		glfwSwapInterval(1);
+
+		glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
+		mat4 M = view * W;
+		glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
+		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
+		glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
+		CHECK_GL_ERRORS;
+
+		// Set Material values:
+		glm::vec3 kd(0.5f, 0.7f, 0.5f);
+		glUniform3fv(kd_location, 1, value_ptr(kd));
+		glm::vec3 ks(0.5f, 0.5f, 0.5f);
+		glUniform3fv(ks_location, 1, value_ptr(ks));
+		float sh = 100.0f;
+		glUniform1f(sh_location, sh);
+		CHECK_GL_ERRORS;
+
+		// Draw the surface.
+		glBindVertexArray( m_surface_vao );
+		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_vertices());
+	m_shader.disable();
+}
+
+void A1::updateLighting(){
+	// Lighting
+	m_shader.enable();
+		glm::vec3 lpos(0.0f, 10.0f, 10.0f);
+		glUniform3fv(light_position, 1, value_ptr(lpos));
+		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
+		glUniform3fv(light_colour, 1, value_ptr(lcol));
+		glm::vec3 lamb(0.1f);
+		glUniform3fv(light_ambient, 1, value_ptr(lamb));
+		CHECK_GL_ERRORS;
+	m_shader.disable();
+}
+
+void A1::updateCPs(glm::mat4 W){
 	//CP vertices
 	glBindVertexArray(m_cp_vao);
 	glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
@@ -148,6 +192,29 @@ void A1::updateSurface(){
 	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 
 	CHECK_GL_ERRORS;
+
+	b_shader.enable();
+		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
+		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
+		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
+		glBindVertexArray( m_cp_vao );
+		if (do_picking){
+			for (int idx = 0; idx < surface->get_n_cps(); idx++){
+				float r = float(idx&0xff) / 255.0f;
+				float g = float((idx>>8)&0xff) / 255.0f;
+				float b = float((idx>>16)&0xff) / 255.0f;
+				glUniform3f( col_uni, r, g, b);
+				glDrawArrays(GL_TRIANGLES, idx*36, 36);
+			}
+		} else {
+			for (int idx = 0; idx < surface->get_n_cps(); idx++){
+				glm::vec3 cp_col = surface->get_cp_col(idx);
+				glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
+				glDrawArrays( GL_TRIANGLES, idx*36, 36);
+			}
+		}
+		CHECK_GL_ERRORS;
+	b_shader.disable();
 }
 
 //----------------------------------------------------------------------------------------
@@ -210,64 +277,27 @@ void A1::restart_app(){
 	old_rot_rads = 0.0f;
 }
 
+mat4 A1::get_W(){
+	mat4 W;
+	W = glm::rotate(W, rot_rads, vec3(0, 1, 0));
+	W = glm::scale(W, vec3(zoom, zoom, zoom));
+
+	return W;
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Called once per frame, after guiLogic().
  */
 void A1::draw()
 {
-	updateSurface();
 	// Create a global transformation for the model (centre it).
 	mat4 W;
-	W = glm::rotate(W, rot_rads, vec3(0, 1, 0));
-	W = glm::scale(W, vec3(zoom, zoom, zoom));
+	W = get_W();
 	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
-
-	m_shader.enable();
-		glEnable( GL_DEPTH_TEST );
-		glEnable( GL_CULL_FACE );
-		glfwSwapInterval(1);
-
-		glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
-		mat4 M = view * W;
-		glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
-		glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
-		CHECK_GL_ERRORS;
-
-		// Lighting
-		glm::vec3 lpos(0.0f, 10.0f, 10.0f);
-		glUniform3fv(light_position, 1, value_ptr(lpos));
-		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
-		glUniform3fv(light_colour, 1, value_ptr(lcol));
-		glm::vec3 lamb(0.1f);
-		glUniform3fv(light_ambient, 1, value_ptr(lamb));
-		CHECK_GL_ERRORS;
-
-		// Set Material values:
-		glm::vec3 kd(0.5f, 0.7f, 0.5f);
-		glUniform3fv(kd_location, 1, value_ptr(kd));
-		glm::vec3 ks(0.5f, 0.5f, 0.5f);
-		glUniform3fv(ks_location, 1, value_ptr(ks));
-		float sh = 100.0f;
-		glUniform1f(sh_location, sh);
-		CHECK_GL_ERRORS;
-
-		// Draw the surface.
-		glBindVertexArray( m_surface_vao );
-		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_vertices());
-
-	m_shader.disable();
-
-	b_shader.enable();
-		glBindVertexArray( m_cp_vao );
-		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
-		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
-		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
-		glUniform3f( col_uni, 1, 0, 0 );
-		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_cp_vertices());
-		CHECK_GL_ERRORS;
-	b_shader.disable();
+	updateLighting();
+	updateSurface(W);
+	updateCPs(W);
 
 	// Restore defaults
 	glBindVertexArray( 0 );
@@ -327,6 +357,42 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 		// mouse button, initiate a rotation.
 		if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS){
 			dragging = true;
+			do_picking = true;
+			double xpos, ypos;
+			glfwGetCursorPos(m_window, &xpos, &ypos);
+			glClearColor(1.0, 1.0, 1.0, 1.0 );
+			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+			glClearColor(0.35, 0.35, 0.35, 1.0);
+
+			mat4 W = get_W();
+			updateCPs(W);
+
+			CHECK_GL_ERRORS;
+
+			// Ugly -- FB coordinates might be different than Window coordinates
+			// (e.g., on a retina display).  Must compensate.
+			xpos *= double(m_framebufferWidth) / double(m_windowWidth);
+			// WTF, don't know why I have to measure y relative to the bottom of
+			// the window in this case.
+			ypos = m_windowHeight - ypos;
+			ypos *= double(m_framebufferHeight) / double(m_windowHeight);
+
+			GLubyte buffer[ 4 ] = { 0, 0, 0, 0 };
+			// A bit ugly -- don't want to swap the just-drawn false colours
+			// to the screen, so read from the back buffer.
+			glReadBuffer( GL_BACK );
+			// Actually read the pixel at the mouse location.
+			glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+			CHECK_GL_ERRORS;
+
+			// Reassemble the object ID.
+			unsigned int what = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+
+			std::cout << "Selected idx " << what << std::endl;
+
+			surface->select_cp(what);
+
+			do_picking = false;
 		}
 		if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE){
 			dragging = false;

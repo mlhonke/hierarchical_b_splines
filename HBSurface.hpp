@@ -15,6 +15,9 @@ public:
     unsigned int get_cp_vertices_size();
     glm::vec3* get_cp_vertices();
     unsigned int get_n_cp_vertices();
+    unsigned int get_n_cps();
+    void select_cp(int idx);
+    glm::vec3 get_cp_col(int idx);
 
 private:
     glm::vec3 eval_point(int x, int y, float u, float v);
@@ -29,6 +32,9 @@ private:
     int npatches;
     int ncpx;
     int ncpy;
+    int sel_cp_i;
+    int sel_cp_j;
+    int sel_idx = 10;
     int k = 4;
     int l = 4;
     Eigen::MatrixXf* cpsx;
@@ -39,5 +45,6 @@ private:
     glm::vec3* norm;
     glm::vec3* cp_verts;
     unsigned int nvert = 0;
+    unsigned int ncps = 0;
     bool refined = true;
 };

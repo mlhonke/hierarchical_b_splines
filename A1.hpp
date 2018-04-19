@@ -31,11 +31,17 @@ private:
 	void restart_app();
 	void initBuffers();
 	void initSurface();
-	void updateSurface();
+	void updateSurface(glm::mat4 W);
+	void updateCPs(glm::mat4 W);
+	void updateLighting();
+	glm::mat4 get_W();
+
+	//Fields for object picking
+	bool do_picking = false;
 
 	// Fields related to surface properties
-	int npx = 8;
-	int npy = 8;
+	int npx = 4;
+	int npy = 4;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;
@@ -58,7 +64,7 @@ private:
 	GLuint m_cp_vbo;
 
 	// Fields related to movement.
-	bool dragging;
+	bool dragging = false;
 	float old_x = 0;
 	float rot_rads = 0.0f;
 	float old_rot_rads = 0.0f;
