@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 
 #include "cs488-framework/CS488Window.hpp"
 #include "cs488-framework/OpenGLImport.hpp"
@@ -35,6 +36,12 @@ private:
 	void updateCPs(glm::mat4 W);
 	void updateLighting();
 	glm::mat4 get_W();
+	int pick_object();
+	glm::vec3 GetOGLPos(float x, float y, float depth);
+	float getDepth(float x, float y);
+	float depth_val;
+	bool depth_set = false;
+	bool drag_cp = false;
 
 	//Fields for object picking
 	bool do_picking = false;
@@ -66,9 +73,12 @@ private:
 	// Fields related to movement.
 	bool dragging = false;
 	float old_x = 0;
+	float old_y = 0;
 	float rot_rads = 0.0f;
 	float old_rot_rads = 0.0f;
 	float zoom = 1.0f;
+	float drag_x = 0;
+	float drag_y = 0;
 
 	// Matrices controlling the camera and projection.
 	glm::mat4 proj;

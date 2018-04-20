@@ -18,12 +18,16 @@ public:
     unsigned int get_n_cps();
     void select_cp(int idx);
     glm::vec3 get_cp_col(int idx);
+    bool is_cp_selected();
+    void move_selected_cp(glm::vec3 delta);
+    unsigned int get_selected_cp_idx();
 
 private:
     glm::vec3 eval_point(int x, int y, float u, float v);
     void init_test();
     unsigned int fxy(int x, int y);
 
+    bool selected = false;
     int npx;
     int npy;
     int res;
@@ -34,7 +38,7 @@ private:
     int ncpy;
     int sel_cp_i;
     int sel_cp_j;
-    int sel_idx = 10;
+    int sel_idx = 0;
     int k = 4;
     int l = 4;
     Eigen::MatrixXf* cpsx;

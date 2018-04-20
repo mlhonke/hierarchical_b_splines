@@ -81,7 +81,7 @@ void A1::init()
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
 	view = glm::lookAt(
-		glm::vec3( -2.0f, 4.0f, -2.0f ),
+		glm::vec3( -2.0f, 3.0f, 0.0f ),
 		glm::vec3( 0.0f, 0.0f, 0.0f ),
 		glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
@@ -194,6 +194,8 @@ void A1::updateCPs(glm::mat4 W){
 	CHECK_GL_ERRORS;
 
 	b_shader.enable();
+		glEnable( GL_DEPTH_TEST );
+		glEnable( GL_CULL_FACE );
 		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
 		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
 		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
@@ -326,6 +328,42 @@ bool A1::cursorEnterWindowEvent (
 	return eventHandled;
 }
 
+glm::vec3 A1::GetOGLPos(float x, float y, float depth)
+{
+	//std::cout << x << " " << y << std::endl;
+    GLint viewport[4];
+	glm::vec4 port(viewport[0], viewport[1], viewport[2], viewport[3]);
+    GLfloat winX, winY, winZ;
+    GLdouble posX, posY, posZ;
+
+	glGetIntegerv( GL_VIEWPORT, viewport );
+	//std::cout << viewport[0] << " " << viewport[1] << " " << viewport[2] << " " << viewport[3] << std::endl;
+    winX = (float)x;
+    winY = (float)viewport[3] - (float)y;
+	winZ = depth;
+	glm::vec3 win(winX, winY, winZ);
+	glm::vec3 pos;
+	glm::mat4 modelview = view*get_W();
+
+    pos = glm::unProject(win, modelview, proj, port);
+	//std::cout << pos.x << " " << pos.y << " " << pos.z << std::endl;
+
+    return pos;
+}
+
+float A1::getDepth(float x, float y){
+	GLint viewport[4];
+	GLfloat winX, winY, winZ;
+
+	glGetIntegerv( GL_VIEWPORT, viewport );
+	winX = (float)x;
+	winY = (float)viewport[3] - (float)y;
+
+	glReadPixels( x, int(winY), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ );
+
+	return winZ;
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Event handler.  Handles mouse cursor movement events.
@@ -335,14 +373,68 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 	bool eventHandled(false);
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		// Rotate the model if mouse is being dragged.
-		if (dragging){
+		if (dragging && !drag_cp){
 			rot_rads = old_rot_rads - 2*3.1415*(old_x - xPos)/m_framebufferWidth;
+		} else if (dragging && drag_cp == true){
+			//std::cout << xPos << " " << yPos << " " << old_x << " " << old_y << std::endl;
+			if (!depth_set){
+				depth_set = true;
+				depth_val = getDepth(xPos, yPos);
+				std::cout << "Depth Read" << std::endl;
+			}
+			GetOGLPos(old_x, old_y, depth_val);
+			glm::vec3 delta_model = GetOGLPos(xPos, yPos, depth_val);// - GetOGLPos(old_x, old_y);
+
+			//std::cout << delta_model.x << " " << delta_model.y << " " << delta_model.z << std::endl;
+			surface->move_selected_cp(delta_model);
+			old_x = xPos;
+			old_y = yPos;
 		} else {
 		// Track the position of the mouse in preparation for rotation.
 			old_x = xPos;
+			old_y = yPos;
 		}
 	}
 	return eventHandled;
+}
+
+int A1::pick_object(){
+	do_picking = true;
+	double xpos, ypos;
+	glfwGetCursorPos(m_window, &xpos, &ypos);
+	glClearColor(1.0, 1.0, 1.0, 1.0 );
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glClearColor(0.35, 0.35, 0.35, 1.0);
+
+	mat4 W = get_W();
+	updateCPs(W);
+
+	CHECK_GL_ERRORS;
+
+	// Ugly -- FB coordinates might be different than Window coordinates
+	// (e.g., on a retina display).  Must compensate.
+	xpos *= double(m_framebufferWidth) / double(m_windowWidth);
+	// WTF, don't know why I have to measure y relative to the bottom of
+	// the window in this case.
+	ypos = m_windowHeight - ypos;
+	ypos *= double(m_framebufferHeight) / double(m_windowHeight);
+
+	GLubyte buffer[ 4 ] = { 0, 0, 0, 0 };
+	// A bit ugly -- don't want to swap the just-drawn false colours
+	// to the screen, so read from the back buffer.
+	glReadBuffer( GL_BACK );
+	// Actually read the pixel at the mouse location.
+	glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+	CHECK_GL_ERRORS;
+
+	// Reassemble the object ID.
+	unsigned int what = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
+
+	//std::cout << "Selected idx " << what << std::endl;
+
+	do_picking = false;
+
+	return what;
 }
 
 //----------------------------------------------------------------------------------------
@@ -357,47 +449,22 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 		// mouse button, initiate a rotation.
 		if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS){
 			dragging = true;
-			do_picking = true;
-			double xpos, ypos;
-			glfwGetCursorPos(m_window, &xpos, &ypos);
-			glClearColor(1.0, 1.0, 1.0, 1.0 );
-			glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-			glClearColor(0.35, 0.35, 0.35, 1.0);
 
-			mat4 W = get_W();
-			updateCPs(W);
-
-			CHECK_GL_ERRORS;
-
-			// Ugly -- FB coordinates might be different than Window coordinates
-			// (e.g., on a retina display).  Must compensate.
-			xpos *= double(m_framebufferWidth) / double(m_windowWidth);
-			// WTF, don't know why I have to measure y relative to the bottom of
-			// the window in this case.
-			ypos = m_windowHeight - ypos;
-			ypos *= double(m_framebufferHeight) / double(m_windowHeight);
-
-			GLubyte buffer[ 4 ] = { 0, 0, 0, 0 };
-			// A bit ugly -- don't want to swap the just-drawn false colours
-			// to the screen, so read from the back buffer.
-			glReadBuffer( GL_BACK );
-			// Actually read the pixel at the mouse location.
-			glReadPixels( int(xpos), int(ypos), 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
-			CHECK_GL_ERRORS;
-
-			// Reassemble the object ID.
-			unsigned int what = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
-
-			std::cout << "Selected idx " << what << std::endl;
-
-			surface->select_cp(what);
-
-			do_picking = false;
+			int what = pick_object();
+			if (what < surface->get_n_cps()){
+				surface->select_cp(what);
+				drag_cp = true;
+			} else {
+				drag_cp = false;
+			}
 		}
 		if (button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE){
 			dragging = false;
+			depth_set = false;
 			rot_rads = fmod(rot_rads, 2*3.1415);
 			old_rot_rads = rot_rads;
+			drag_x = 0;
+			drag_y = 0;
 		}
 	}
 

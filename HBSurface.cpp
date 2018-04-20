@@ -165,8 +165,12 @@ glm::vec3* HBSurface::get_cp_vertices(){
     return cp_verts;
 }
 
+bool HBSurface::is_cp_selected(){
+    return selected;
+}
+
 glm::vec3 HBSurface::get_cp_col(int idx){
-    if (idx == sel_idx){
+    if (idx == sel_idx && selected == true){
         //std::cout << "what I think is selected " << idx << std::endl;
         return glm::vec3(1.0f, 0.0f, 0.0f);
     } else {
@@ -176,10 +180,22 @@ glm::vec3 HBSurface::get_cp_col(int idx){
 
 void HBSurface::select_cp(int idx){
     if (idx < ncps){
+        selected = true;
         sel_idx = idx;
         sel_cp_i = idx/ncpx;
         sel_cp_j = idx%ncpx;
     }
+}
+
+void HBSurface::move_selected_cp(glm::vec3 delta){
+    //Require delta to be CP's coordinates
+    (*cpsx)(sel_cp_i, sel_cp_j) = delta.x;
+    (*cpsy)(sel_cp_i, sel_cp_j) = delta.y;
+    (*cpsz)(sel_cp_i, sel_cp_j) = delta.z;
+}
+
+unsigned int HBSurface::get_selected_cp_idx(){
+    return sel_idx;
 }
 
 unsigned int HBSurface::get_n_cps(){
