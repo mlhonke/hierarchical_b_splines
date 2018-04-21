@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "HBSurface.hpp"
 
 using namespace glm;
 using namespace std;
@@ -18,11 +19,6 @@ int DIM = 2;
 // Constructor
 A1::A1()
 {
-	initSurface();
-}
-
-void A1::initSurface(){
-	surface = new HBSurface(npx, npy, 16);
 }
 
 //----------------------------------------------------------------------------------------
@@ -30,6 +26,15 @@ void A1::initSurface(){
 A1::~A1()
 {
 	delete surface;
+}
+
+void A1::gen_buffers(GLuint* vaos, GLuint* vbos){
+	// Create the vertex array to record buffer assignments.
+	glGenVertexArrays( 2, vaos );
+
+	// Create the buffer.
+	glGenBuffers( 3, vbos );
+	CHECK_GL_ERRORS;
 }
 
 //----------------------------------------------------------------------------------------
@@ -53,30 +58,12 @@ void A1::init()
 	b_shader.attachFragmentShader( getAssetFilePath( "BasicFragmentShader.fs" ).c_str() );
 	b_shader.link();
 
-	// Set up the uniforms
-	Pers = m_shader.getUniformLocation( "Perspective" );
-	Model = m_shader.getUniformLocation( "ModelView" );
-	Pos = m_shader.getAttribLocation( "position" );
-	m_normalAttribLocation = m_shader.getAttribLocation("normal");
-	kd_location = m_shader.getUniformLocation("material.kd");
-	ks_location = m_shader.getUniformLocation("material.ks");
-	sh_location = m_shader.getUniformLocation("material.shininess");
-	norm_location = m_shader.getUniformLocation("NormalMatrix");
-
 	//Set up lighting
 	light_position = m_shader.getUniformLocation("light.position");
 	light_colour = m_shader.getUniformLocation("light.rgbIntensity");
 	light_ambient = m_shader.getUniformLocation("ambientIntensity");
 
-	//Set up basic shader uniforms (non-phong)
-	P_uni = b_shader.getUniformLocation( "P" );
-	V_uni = b_shader.getUniformLocation( "V" );
-	M_uni = b_shader.getUniformLocation( "M" );
-	col_uni = b_shader.getUniformLocation( "colour" );
-	posAttrib2 = b_shader.getAttribLocation( "position");
-
-	//Initialize the vertex buffers
-	initBuffers();
+	surface = new HBSurface(this, npx, npy, 16);
 
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
@@ -89,81 +76,6 @@ void A1::init()
 		glm::radians( 45.0f ),
 		float( m_framebufferWidth ) / float( m_framebufferHeight ),
 		1.0f, 1000.0f );
-}
-
-/*
- * initBuffers: Initializes vertex arrays and buffers for the grid,
- * cursor and cubes.
- */
-void A1::initBuffers()
-{
-	GLuint vaos[2];
-	GLuint vbos[3];
-
-	// Create the vertex array to record buffer assignments.
-	glGenVertexArrays( 2, vaos );
-
-	// Create the buffer.
-	glGenBuffers( 3, vbos );
-
-	//Assign vertex arrays and buffers to named variables for easier tracking.
-	m_surface_vao = vaos[0];
-	m_cp_vao = vaos[1];
-
-	m_surface_vbo = vbos[0];
-	m_surface_normals_vbo = vbos[1];
-	m_cp_vbo = vbos[2];
-}
-
-/*
-initSurface: Updates the surface vertices in the buffer.
-*/
-void A1::updateSurface(glm::mat4 W){
-	glBindVertexArray(m_surface_vao);
-
-	//Position data
-	glBindBuffer(GL_ARRAY_BUFFER, m_surface_vbo);
-	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_vertices(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray( Pos );
-	glVertexAttribPointer( Pos, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
-
-	//Normal data
-	glBindBuffer(GL_ARRAY_BUFFER, m_surface_normals_vbo);
-	glBufferData(GL_ARRAY_BUFFER, surface->get_vertices_size(), surface->get_normals(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray(m_normalAttribLocation);
-	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-	glBindVertexArray( 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-
-	CHECK_GL_ERRORS;
-
-	m_shader.enable();
-		glEnable( GL_DEPTH_TEST );
-		glEnable( GL_CULL_FACE );
-		glfwSwapInterval(1);
-
-		glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
-		mat4 M = view * W;
-		glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
-		glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
-		CHECK_GL_ERRORS;
-
-		// Set Material values:
-		glm::vec3 kd(0.5f, 0.7f, 0.5f);
-		glUniform3fv(kd_location, 1, value_ptr(kd));
-		glm::vec3 ks(0.5f, 0.5f, 0.5f);
-		glUniform3fv(ks_location, 1, value_ptr(ks));
-		float sh = 100.0f;
-		glUniform1f(sh_location, sh);
-		CHECK_GL_ERRORS;
-
-		// Draw the surface.
-		glBindVertexArray( m_surface_vao );
-		glDrawArrays( GL_TRIANGLES, 0, surface->get_n_vertices());
-	m_shader.disable();
 }
 
 void A1::updateLighting(){
@@ -179,45 +91,6 @@ void A1::updateLighting(){
 	m_shader.disable();
 }
 
-void A1::updateCPs(glm::mat4 W){
-	//CP vertices
-	glBindVertexArray(m_cp_vao);
-	glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
-	glBufferData(GL_ARRAY_BUFFER, surface->get_cp_vertices_size(), surface->get_cp_vertices(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray( posAttrib2 );
-	glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
-
-	glBindVertexArray( 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-
-	CHECK_GL_ERRORS;
-
-	b_shader.enable();
-		glEnable( GL_DEPTH_TEST );
-		glEnable( GL_CULL_FACE );
-		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
-		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
-		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
-		glBindVertexArray( m_cp_vao );
-		if (do_picking){
-			for (int idx = 0; idx < surface->get_n_cps(); idx++){
-				float r = float(idx&0xff) / 255.0f;
-				float g = float((idx>>8)&0xff) / 255.0f;
-				float b = float((idx>>16)&0xff) / 255.0f;
-				glUniform3f( col_uni, r, g, b);
-				glDrawArrays(GL_TRIANGLES, idx*36, 36);
-			}
-		} else {
-			for (int idx = 0; idx < surface->get_n_cps(); idx++){
-				glm::vec3 cp_col = surface->get_cp_col(idx);
-				glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
-				glDrawArrays( GL_TRIANGLES, idx*36, 36);
-			}
-		}
-		CHECK_GL_ERRORS;
-	b_shader.disable();
-}
 
 //----------------------------------------------------------------------------------------
 /*
@@ -298,8 +171,8 @@ void A1::draw()
 	W = get_W();
 	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
 	updateLighting();
-	updateSurface(W);
-	updateCPs(W);
+
+	surface->render(m_shader, b_shader, W, proj, view, do_picking);
 
 	// Restore defaults
 	glBindVertexArray( 0 );
@@ -406,8 +279,7 @@ int A1::pick_object(){
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	glClearColor(0.35, 0.35, 0.35, 1.0);
 
-	mat4 W = get_W();
-	updateCPs(W);
+	draw();
 
 	CHECK_GL_ERRORS;
 
@@ -523,6 +395,18 @@ bool A1::keyInputEvent(int key, int action, int mods) {
 		if (key == GLFW_KEY_Q){
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_S){
+			surface->split_selected_cp();
+			eventHandled = true;
+		}
+
+
+		if (key == GLFW_KEY_P){
+			glm::vec3 coords = surface->get_selected_cp_coords();
+			std::cout << glm::to_string(coords) << std::endl;
 			eventHandled = true;
 		}
 	}

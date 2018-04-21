@@ -220,9 +220,10 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
  ../../shared/include/GLFW/glfw3.h ../../shared/gl3w/GL/glcorearb.h \
  ../../shared/cs488-framework/OpenGLImport.hpp \
  ../../shared/gl3w/GL/gl3w.h \
- ../../shared/cs488-framework/ShaderProgram.hpp ../HBSurface.hpp \
- ../Eigen/Dense ../Eigen/Core \
- ../Eigen/src/Core/util/DisableStupidWarnings.h \
+ ../../shared/cs488-framework/ShaderProgram.hpp \
+ ../../shared/cs488-framework/GlErrorCheck.hpp ../../shared/imgui/imgui.h \
+ ../../shared/imgui/imconfig.h ../HBSurface.hpp ../Eigen/Dense \
+ ../Eigen/Core ../Eigen/src/Core/util/DisableStupidWarnings.h \
  ../Eigen/src/Core/util/Macros.h ../Eigen/src/Core/util/MKL_support.h \
  ../Eigen/src/Core/util/Constants.h ../Eigen/src/Core/util/Meta.h \
  ../Eigen/src/Core/util/ForwardDeclarations.h \
@@ -338,9 +339,7 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
  ../Eigen/src/Eigenvalues/RealQZ.h \
  ../Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
  ../Eigen/src/Eigenvalues/./RealQZ.h \
- ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp \
- ../../shared/cs488-framework/GlErrorCheck.hpp ../../shared/imgui/imgui.h \
- ../../shared/imgui/imconfig.h
+ ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp
 
 ../A1.hpp:
 
@@ -792,6 +791,12 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
 
 ../../shared/cs488-framework/ShaderProgram.hpp:
 
+../../shared/cs488-framework/GlErrorCheck.hpp:
+
+../../shared/imgui/imgui.h:
+
+../../shared/imgui/imconfig.h:
+
 ../HBSurface.hpp:
 
 ../Eigen/Dense:
@@ -1143,9 +1148,3 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
 ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
 
 ../cube.hpp:
-
-../../shared/cs488-framework/GlErrorCheck.hpp:
-
-../../shared/imgui/imgui.h:
-
-../../shared/imgui/imconfig.h:

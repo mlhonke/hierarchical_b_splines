@@ -7,12 +7,13 @@
 #include "cs488-framework/OpenGLImport.hpp"
 #include "cs488-framework/ShaderProgram.hpp"
 
-#include "HBSurface.hpp"
+class HBSurface;
 
 class A1 : public CS488Window {
 public:
 	A1();
 	virtual ~A1();
+	void gen_buffers(GLuint* vaos, GLuint* vbos);
 
 protected:
 	virtual void init() override;
@@ -30,10 +31,6 @@ protected:
 
 private:
 	void restart_app();
-	void initBuffers();
-	void initSurface();
-	void updateSurface(glm::mat4 W);
-	void updateCPs(glm::mat4 W);
 	void updateLighting();
 	glm::mat4 get_W();
 	int pick_object();
@@ -53,6 +50,7 @@ private:
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;
 	ShaderProgram b_shader;
+
 	GLint Pers; // Uniform location for Projection matrix.
 	GLint Model; // Uniform location for Model matrix.
 
@@ -64,11 +62,6 @@ private:
 
 	// Fields related to grid geometry.
 	HBSurface* surface;
-	GLuint m_surface_vao; // Vertex Array Object
-	GLuint m_surface_vbo; // Vertex Buffer Object
-	GLuint m_surface_normals_vbo;
-	GLuint m_cp_vao;
-	GLuint m_cp_vbo;
 
 	// Fields related to movement.
 	bool dragging = false;
