@@ -134,6 +134,12 @@ void A1::guiLogic()
 			showTestWindow = !showTestWindow;
 		}
 */
+		if (level >= 0){
+			ImGui::Text( "Control Point Level: %d", level);
+		} else {
+			ImGui::Text( "Control Point Level: All");
+		}
+
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
 	ImGui::End();
@@ -172,7 +178,8 @@ void A1::draw()
 	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
 	updateLighting();
 
-	surface->render(W, proj, view, do_picking);
+	surface->render_points(W, proj, view, do_picking, level);
+	surface->render_surface(W, proj, view, do_picking);
 
 	// Restore defaults
 	glBindVertexArray( 0 );
@@ -325,7 +332,7 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 			dragging = true;
 
 			int what = pick_object();
-			surface->select_cp(what, lctrl);
+			surface->select_cp(what, lctrl, level);
 
 			if (what == surface->get_selected_cp_idx()){
 				drag_cp = true;
@@ -416,11 +423,22 @@ bool A1::keyInputEvent(int key, int action, int mods) {
 			std::cout << glm::to_string(coords) << std::endl;
 			eventHandled = true;
 		}
+
+		if (key == GLFW_KEY_PAGE_UP){
+			level++;
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_PAGE_DOWN){
+			if (level >= 0){
+				level--;
+			}
+			eventHandled = true;
+		}
 	}
 
 	if (action == GLFW_RELEASE){
-		if (key = GLFW_KEY_LEFT_CONTROL){
-			std::cout << "released" << std::endl;
+		if (key == GLFW_KEY_LEFT_CONTROL){
 			lctrl = false;
 			eventHandled = false;
 		}

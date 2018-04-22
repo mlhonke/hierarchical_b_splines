@@ -47,6 +47,7 @@ private:
 	// Fields related to surface properties
 	int npx = 7;
 	int npy = 7;
+	int level = -1;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;

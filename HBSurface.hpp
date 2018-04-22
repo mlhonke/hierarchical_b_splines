@@ -22,7 +22,8 @@ typedef Eigen::Matrix<float, 7, 7> Matrix7f;
 class HBSurface {
 public:
     HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader, int npx, int npy, int res);
-    void render(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking);
+    void render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking, int level);
+    void render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking);
     glm::vec3* get_vertices();
     glm::vec3* get_normals();
     unsigned int get_vertices_size();
@@ -31,7 +32,7 @@ public:
     glm::vec3* get_cp_vertices();
     unsigned int get_n_cp_vertices();
     unsigned int get_n_cps();
-    void select_cp(int idx, bool second);
+    void select_cp(int idx, bool second, int level);
     glm::vec3 get_cp_col(int idx);
     bool is_cp_selected();
     void move_selected_cp(glm::vec3 delta);
@@ -43,6 +44,7 @@ public:
     Eigen::MatrixXf* cpsx;
     Eigen::MatrixXf* cpsy;
     Eigen::MatrixXf* cpsz;
+    Eigen::MatrixXi* cpmask;
     GLFWwindow * m_window;
     static int idx_start;
 
@@ -53,6 +55,8 @@ private:
     glm::vec3 eval_point(int x, int y, float u, float v);
     void init_test();
     unsigned int fxy(int x, int y);
+    void split();
+    bool is_cp_mine(int idx);
 
     int my_idx_start = idx_start;
     bool has_children = false;

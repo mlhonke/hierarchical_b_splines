@@ -24,6 +24,8 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
     cpsx = new Eigen::MatrixXf(ncpx, ncpy);
     cpsy = new Eigen::MatrixXf(ncpx, ncpy);
     cpsz = new Eigen::MatrixXf(ncpx, ncpy);
+    cpmask = new Eigen::MatrixXi(ncpx, ncpy);
+    *cpmask = Eigen::MatrixXi::Constant(ncpx, ncpy, 1);
 
     idx_start += ncps;
     //std::cout << my_idx_start << std::endl;
@@ -90,94 +92,105 @@ void HBSurface::init_render(){
     CHECK_GL_ERRORS;
 }
 
-void HBSurface::render(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
+void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking, int level){
+    if (level <= 0){
+        //CP vertices
+        glBindVertexArray(m_cp_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
+        glBufferData(GL_ARRAY_BUFFER, get_cp_vertices_size(), get_cp_vertices(), GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray( posAttrib2 );
+        glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+
+        glBindVertexArray( 0 );
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+
+        CHECK_GL_ERRORS;
+
+        b_shader->enable();
+            glEnable( GL_DEPTH_TEST );
+            glEnable( GL_CULL_FACE );
+            glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
+            glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
+            glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
+            glBindVertexArray( m_cp_vao );
+            if (do_picking){
+                for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
+                    float r = float(idx&0xff) / 255.0f;
+                    float g = float((idx>>8)&0xff) / 255.0f;
+                    float b = float((idx>>16)&0xff) / 255.0f;
+                    glUniform3f( col_uni, r, g, b);
+                    glDrawArrays(GL_TRIANGLES, (idx-my_idx_start)*36, 36);
+                }
+            } else {
+                for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
+                    glm::vec3 cp_col = get_cp_col(idx);
+                    glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
+                    glDrawArrays( GL_TRIANGLES, (idx-my_idx_start)*36, 36);
+                }
+            }
+            CHECK_GL_ERRORS;
+        b_shader->disable();
+    }
+
+    if (level != 0){
+        level--;
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            (*child)->render_points(W, proj, view, do_picking, level);
+        }
+    }
+}
+
+void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
     //Render surface vertices
     glBindVertexArray(m_surface_vao);
 
-	//Position data
-	glBindBuffer(GL_ARRAY_BUFFER, m_surface_vbo);
-	glBufferData(GL_ARRAY_BUFFER, get_vertices_size(), get_vertices(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray( Pos );
-	glVertexAttribPointer( Pos, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
+    //Position data
+    glBindBuffer(GL_ARRAY_BUFFER, m_surface_vbo);
+    glBufferData(GL_ARRAY_BUFFER, get_vertices_size(), get_vertices(), GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray( Pos );
+    glVertexAttribPointer( Pos, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
 
-	//Normal data
-	glBindBuffer(GL_ARRAY_BUFFER, m_surface_normals_vbo);
-	glBufferData(GL_ARRAY_BUFFER, get_vertices_size(), get_normals(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray(m_normalAttribLocation);
-	glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    //Normal data
+    glBindBuffer(GL_ARRAY_BUFFER, m_surface_normals_vbo);
+    glBufferData(GL_ARRAY_BUFFER, get_vertices_size(), get_normals(), GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(m_normalAttribLocation);
+    glVertexAttribPointer(m_normalAttribLocation, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-	glBindVertexArray( 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+    glBindVertexArray( 0 );
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
 
-	CHECK_GL_ERRORS;
+    CHECK_GL_ERRORS;
 
-	m_shader->enable();
-		glEnable( GL_DEPTH_TEST );
-		glEnable( GL_CULL_FACE );
-		glfwSwapInterval(1);
+    m_shader->enable();
+        glEnable( GL_DEPTH_TEST );
+        glEnable( GL_CULL_FACE );
+        glfwSwapInterval(1);
 
-		glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
-		mat4 M = view * W;
-		glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
-		mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
-		glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
-		CHECK_GL_ERRORS;
+        glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
+        mat4 M = view * W;
+        glUniformMatrix4fv( Model, 1, GL_FALSE, value_ptr( M ) );
+        mat3 normalMatrix = glm::transpose(glm::inverse(mat3(M)));
+        glUniformMatrix3fv(norm_location, 1, GL_FALSE, value_ptr(normalMatrix));
+        CHECK_GL_ERRORS;
 
-		// Set Material values:
-		glm::vec3 kd(0.5f, 0.7f, 0.5f);
-		glUniform3fv(kd_location, 1, value_ptr(kd));
-		glm::vec3 ks(0.5f, 0.5f, 0.5f);
-		glUniform3fv(ks_location, 1, value_ptr(ks));
-		float sh = 100.0f;
-		glUniform1f(sh_location, sh);
-		CHECK_GL_ERRORS;
+        // Set Material values:
+        glm::vec3 kd(0.5f, 0.7f, 0.5f);
+        glUniform3fv(kd_location, 1, value_ptr(kd));
+        glm::vec3 ks(0.5f, 0.5f, 0.5f);
+        glUniform3fv(ks_location, 1, value_ptr(ks));
+        float sh = 100.0f;
+        glUniform1f(sh_location, sh);
+        CHECK_GL_ERRORS;
 
-		// Draw the surface.
-		glBindVertexArray( m_surface_vao );
-		glDrawArrays( GL_TRIANGLES, 0, get_n_vertices());
-	m_shader->disable();
-
-    //CP vertices
-	glBindVertexArray(m_cp_vao);
-	glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
-	glBufferData(GL_ARRAY_BUFFER, get_cp_vertices_size(), get_cp_vertices(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray( posAttrib2 );
-	glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
-
-	glBindVertexArray( 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-
-	CHECK_GL_ERRORS;
-
-	b_shader->enable();
-		glEnable( GL_DEPTH_TEST );
-		glEnable( GL_CULL_FACE );
-		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
-		glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
-		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
-		glBindVertexArray( m_cp_vao );
-		if (do_picking){
-			for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
-				float r = float(idx&0xff) / 255.0f;
-				float g = float((idx>>8)&0xff) / 255.0f;
-				float b = float((idx>>16)&0xff) / 255.0f;
-				glUniform3f( col_uni, r, g, b);
-				glDrawArrays(GL_TRIANGLES, (idx-my_idx_start)*36, 36);
-			}
-		} else {
-			for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
-				glm::vec3 cp_col = get_cp_col(idx);
-				glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
-				glDrawArrays( GL_TRIANGLES, (idx-my_idx_start)*36, 36);
-			}
-		}
-		CHECK_GL_ERRORS;
-	b_shader->disable();
+        // Draw the surface.
+        glBindVertexArray( m_surface_vao );
+        glDrawArrays( GL_TRIANGLES, 0, get_n_vertices());
+    m_shader->disable();
 
     for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
-        (*child)->render(W, proj, view, do_picking);
+        (*child)->render_surface(W, proj, view, do_picking);
     }
 }
 
@@ -235,7 +248,7 @@ glm::vec3* HBSurface::get_vertices(){
                     glm::vec3 A0, A1;
                     glm::vec3 B0, B1;
                     float sign = -1.0f;
-                    if (xp == res && i < npx){
+                    if (xp == res && i < (npx-1)){
                         A0 = eval_point(i+1,j, h, v);
                         A1 = eval_point(i, j, u-h, v);
                         //sign *= -1.0f;
@@ -247,7 +260,7 @@ glm::vec3* HBSurface::get_vertices(){
                         A0 = eval_point(i,j, u+h, v);
                         A1 = eval_point(i, j, u-h, v);
                     }
-                    if (yp == res && j < npy){
+                    if (yp == res && j < (npy-1)){
                         B0 = eval_point(i, j+1, u, h);
                         B1 = eval_point(i, j, u, v-h);
                         //sign *= -1.0f;
@@ -353,18 +366,24 @@ glm::vec3 HBSurface::get_selected_cp_coords(){
     return glm::vec3((*cpsx)(sel_cp_i, sel_cp_j), (*cpsy)(sel_cp_i, sel_cp_j), (*cpsz)(sel_cp_i, sel_cp_j));
 }
 
-void HBSurface::select_cp(int idx, bool second){
-    if (idx >= my_idx_start && idx < (my_idx_start + get_n_cps())){
-        std::cout << "running select idx " << idx << std::endl;
-        selected = true;
-        if (second){
-            sel_idx_2 = idx;
-            sel_cp_i_2 = (idx - my_idx_start)/ncpx;
-            sel_cp_j_2 = (idx - my_idx_start)%ncpx;
+void HBSurface::select_cp(int idx, bool second, int level){
+    if (level <= 0){
+        if (is_cp_mine(idx)){
+            std::cout << "running select idx " << idx << std::endl;
+            selected = true;
+            if (second){
+                sel_idx_2 = idx;
+                sel_cp_i_2 = (idx - my_idx_start)/ncpx;
+                sel_cp_j_2 = (idx - my_idx_start)%ncpx;
+            } else {
+                sel_idx = idx;
+                sel_cp_i = (idx - my_idx_start)/ncpx;
+                sel_cp_j = (idx - my_idx_start)%ncpx;
+            }
         } else {
-            sel_idx = idx;
-            sel_cp_i = (idx - my_idx_start)/ncpx;
-            sel_cp_j = (idx - my_idx_start)%ncpx;
+            selected = false;
+            sel_idx = -1;
+            sel_idx_2 = -1;
         }
     } else {
         selected = false;
@@ -372,15 +391,22 @@ void HBSurface::select_cp(int idx, bool second){
         sel_idx_2 = -1;
     }
 
-    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
-        (*child)->select_cp(idx, second);
+    if (level != 0){
+    level -= 1;
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            (*child)->select_cp(idx, second, level);
+        }
     }
+}
+
+bool HBSurface::is_cp_mine(int idx){
+    return (idx >= my_idx_start && idx < (my_idx_start + get_n_cps()));
 }
 
 void HBSurface::move_selected_cp(glm::vec3 delta){
     //Require delta to be CP's coordinates
     if(selected){
-        if (glm::length(delta) < 1000){
+        if ( glm::length(delta) < 1000  && ((*cpmask)(sel_cp_i, sel_cp_j) == 1) ){
             (*cpsx)(sel_cp_i, sel_cp_j) = delta.x;
             (*cpsy)(sel_cp_i, sel_cp_j) = delta.y;
             (*cpsz)(sel_cp_i, sel_cp_j) = delta.z;
@@ -439,6 +465,21 @@ void HBSurface::split_patch(int i, int j, Matrix5f& X, Matrix5f& Y, Matrix5f& Z)
 }
 
 void HBSurface::split_selected_cp(){
+    if(selected){
+        split();
+    } else {
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            (*child)->split_selected_cp();
+        }
+    }
+}
+
+void HBSurface::split(){
+    if (sel_idx_2 < 0){
+        sel_cp_i_2 = sel_cp_i;
+        sel_cp_j_2 = sel_cp_j;
+    }
+
     Matrix5f X, Y, Z; // individual refined patches
     int dim_x, dim_y;
 
@@ -486,9 +527,13 @@ void HBSurface::split_selected_cp(){
     npatches -= pdim_x * pdim_y;
     has_children = true;
     HBSurface* new_surface = new HBSurface(GLapp, m_shader, b_shader, 2*pdim_x, 2*pdim_y, res);
-    (*new_surface->cpsx) = RX;
-    (*new_surface->cpsy) = RY;
-    (*new_surface->cpsz) = RZ;
+    *new_surface->cpsx = RX;
+    *new_surface->cpsy = RY;
+    *new_surface->cpsz = RZ;
+    *new_surface->cpmask = Eigen::MatrixXi::Constant(dim_x, dim_y, 0);
+    //std::cout << *new_surface->cpmask << std::endl;
+    (*new_surface->cpmask).block(3, 3, dim_x - 6, dim_y - 6) = Eigen::MatrixXi::Constant(dim_x - 6, dim_y - 6, 1);
+    //std::cout << *new_surface->cpmask << std::endl;
     child_list.push_back(new_surface);
 
     //This for checking patches
