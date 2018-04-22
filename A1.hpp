@@ -42,10 +42,11 @@ private:
 
 	//Fields for object picking
 	bool do_picking = false;
+	bool lctrl = false;
 
 	// Fields related to surface properties
-	int npx = 4;
-	int npy = 4;
+	int npx = 7;
+	int npy = 7;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;

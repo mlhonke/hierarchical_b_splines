@@ -1,12 +1,15 @@
 #include "HBSurface.hpp"
 #include "A1.hpp"
 
-HBSurface::HBSurface(A1* GLapp, int npx, int npy, int res):npx(npx), npy(npy), res(res), GLapp(GLapp){
+int HBSurface::idx_start = 0;
+
+HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader, int npx, int npy, int res)
+    : npx(npx), npy(npy), res(res), GLapp(GLapp), m_shader(m_shader), b_shader(b_shader){
     children = new HBSurface**[npx];
     for (int i = 0; i<npx; i++){
         children[i] = new HBSurface*[npy];
         for (int j=0; j<npy; j++){
-            children[i][j] = NULL;
+            children[i][j] = this;
         }
     }
 
@@ -21,6 +24,9 @@ HBSurface::HBSurface(A1* GLapp, int npx, int npy, int res):npx(npx), npy(npy), r
     cpsx = new Eigen::MatrixXf(ncpx, ncpy);
     cpsy = new Eigen::MatrixXf(ncpx, ncpy);
     cpsz = new Eigen::MatrixXf(ncpx, ncpy);
+
+    idx_start += ncps;
+    //std::cout << my_idx_start << std::endl;
     //std::cout << *cps << std::endl;
 
     //Initialize all the control points
@@ -50,7 +56,11 @@ HBSurface::HBSurface(A1* GLapp, int npx, int npy, int res):npx(npx), npy(npy), r
             0, 1.0f/2.0f, 1.0f/2.0f, 0,
             0, 1.0/8.0f, 3.0f/4.0f, 1.0f/8.0f,
             0, 0, 1.0f/2.0f, 1.0f/2.0f;
+    //init_test();
+    init_render();
+}
 
+void HBSurface::init_render(){
     GLapp->gen_buffers(vaos, vbos);
     m_surface_vao = vaos[0];
 	m_cp_vao = vaos[1];
@@ -58,30 +68,29 @@ HBSurface::HBSurface(A1* GLapp, int npx, int npy, int res):npx(npx), npy(npy), r
 	m_surface_vbo = vbos[0];
 	m_surface_normals_vbo = vbos[1];
 	m_cp_vbo = vbos[2];
-    //init_test();
-}
 
-void HBSurface::render(ShaderProgram& m_shader, ShaderProgram& b_shader, glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
-    GLint m_normalAttribLocation = m_shader.getAttribLocation("normal");
-	GLint kd_location = m_shader.getUniformLocation("material.kd");
-	GLint ks_location = m_shader.getUniformLocation("material.ks");
-	GLint sh_location = m_shader.getUniformLocation("material.shininess");
-	GLint norm_location = m_shader.getUniformLocation("NormalMatrix");
-    GLint Pos = m_shader.getAttribLocation( "position" );
+    m_normalAttribLocation = m_shader->getAttribLocation("normal");
+    kd_location = m_shader->getUniformLocation("material.kd");
+    ks_location = m_shader->getUniformLocation("material.ks");
+    sh_location = m_shader->getUniformLocation("material.shininess");
+    norm_location = m_shader->getUniformLocation("NormalMatrix");
+    Pos = m_shader->getAttribLocation( "position" );
 
     // Set up the uniforms
-    GLint Pers = m_shader.getUniformLocation( "Perspective" );
-    GLint Model = m_shader.getUniformLocation( "ModelView" );
+    Pers = m_shader->getUniformLocation( "Perspective" );
+    Model = m_shader->getUniformLocation( "ModelView" );
 
     //Set up basic shader uniforms (non-phong)
-    GLint P_uni = b_shader.getUniformLocation( "P" );
-    GLint V_uni = b_shader.getUniformLocation( "V" );
-    GLint M_uni = b_shader.getUniformLocation( "M" );
-    GLint col_uni = b_shader.getUniformLocation( "colour" );
-    GLint posAttrib2 = b_shader.getAttribLocation( "position");
+    P_uni = b_shader->getUniformLocation( "P" );
+    V_uni = b_shader->getUniformLocation( "V" );
+    M_uni = b_shader->getUniformLocation( "M" );
+    col_uni = b_shader->getUniformLocation( "colour" );
+    posAttrib2 = b_shader->getAttribLocation( "position");
 
     CHECK_GL_ERRORS;
+}
 
+void HBSurface::render(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
     //Render surface vertices
     glBindVertexArray(m_surface_vao);
 
@@ -103,7 +112,7 @@ void HBSurface::render(ShaderProgram& m_shader, ShaderProgram& b_shader, glm::ma
 
 	CHECK_GL_ERRORS;
 
-	m_shader.enable();
+	m_shader->enable();
 		glEnable( GL_DEPTH_TEST );
 		glEnable( GL_CULL_FACE );
 		glfwSwapInterval(1);
@@ -127,7 +136,7 @@ void HBSurface::render(ShaderProgram& m_shader, ShaderProgram& b_shader, glm::ma
 		// Draw the surface.
 		glBindVertexArray( m_surface_vao );
 		glDrawArrays( GL_TRIANGLES, 0, get_n_vertices());
-	m_shader.disable();
+	m_shader->disable();
 
     //CP vertices
 	glBindVertexArray(m_cp_vao);
@@ -142,7 +151,7 @@ void HBSurface::render(ShaderProgram& m_shader, ShaderProgram& b_shader, glm::ma
 
 	CHECK_GL_ERRORS;
 
-	b_shader.enable();
+	b_shader->enable();
 		glEnable( GL_DEPTH_TEST );
 		glEnable( GL_CULL_FACE );
 		glUniformMatrix4fv( P_uni, 1, GL_FALSE, value_ptr( proj ) );
@@ -150,25 +159,25 @@ void HBSurface::render(ShaderProgram& m_shader, ShaderProgram& b_shader, glm::ma
 		glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
 		glBindVertexArray( m_cp_vao );
 		if (do_picking){
-			for (int idx = 0; idx < get_n_cps(); idx++){
+			for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
 				float r = float(idx&0xff) / 255.0f;
 				float g = float((idx>>8)&0xff) / 255.0f;
 				float b = float((idx>>16)&0xff) / 255.0f;
 				glUniform3f( col_uni, r, g, b);
-				glDrawArrays(GL_TRIANGLES, idx*36, 36);
+				glDrawArrays(GL_TRIANGLES, (idx-my_idx_start)*36, 36);
 			}
 		} else {
-			for (int idx = 0; idx < get_n_cps(); idx++){
+			for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
 				glm::vec3 cp_col = get_cp_col(idx);
 				glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
-				glDrawArrays( GL_TRIANGLES, idx*36, 36);
+				glDrawArrays( GL_TRIANGLES, (idx-my_idx_start)*36, 36);
 			}
 		}
 		CHECK_GL_ERRORS;
-	b_shader.disable();
+	b_shader->disable();
 
     for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
-        (*child)->render(m_shader, b_shader, W, proj, view, do_picking);
+        (*child)->render(W, proj, view, do_picking);
     }
 }
 
@@ -209,8 +218,11 @@ glm::vec3* HBSurface::get_vertices(){
 
     //Iterate through the patches
     float h = 0.001f;
+    int elem = 0;
     for (int i = 0; i < npx; i++){
-        for (int j = 0; j < npy; j++){
+    for (int j = 0; j < npy; j++){
+        //std::cout << (children[i][j] == this) << std::endl;
+        if (children[i][j] == this){
             //Iterate in the patch
             for (int xp = 0; xp <= res; xp++){
                 float u = (float) xp / (float) res;
@@ -223,19 +235,27 @@ glm::vec3* HBSurface::get_vertices(){
                     glm::vec3 A0, A1;
                     glm::vec3 B0, B1;
                     float sign = -1.0f;
-                    if (xp == res && i != npx){
+                    if (xp == res && i < npx){
                         A0 = eval_point(i+1,j, h, v);
+                        A1 = eval_point(i, j, u-h, v);
+                        //sign *= -1.0f;
+                    } else if (xp == res){
+                        A0 = eval_point(i, j, u, v);
                         A1 = eval_point(i, j, u-h, v);
                         //sign *= -1.0f;
                     } else {
                         A0 = eval_point(i,j, u+h, v);
                         A1 = eval_point(i, j, u-h, v);
                     }
-                    if (yp == res && j != npy){
-                        B0 = eval_point(i,j+1, u, h);
+                    if (yp == res && j < npy){
+                        B0 = eval_point(i, j+1, u, h);
                         B1 = eval_point(i, j, u, v-h);
                         //sign *= -1.0f;
-                    } else {
+                    } else if (yp == res){
+                        B0 = eval_point(i, j, u, v);
+                        B1 = eval_point(i, j, u, v-h);
+                        //sign *= -1.0f;
+                    }else {
                         B0 = eval_point(i,j, u, v+h);
                         B1 = eval_point(i, j, u, v-h);
                     }
@@ -256,7 +276,6 @@ glm::vec3* HBSurface::get_vertices(){
                     glm::vec3 N3 = Nbuffer[fxy(xp, yp+1)];
 
                     //Find the current square element of the surface (ugly)
-                    int elem = (i*npx+j)*res*res*2*3+xp*res*2*3+yp*2*3;
                     //std::cout << P0.x << " " << P0.y << " " << P0.z << std::endl;
                     vert[elem + 0] = P2;
                     vert[elem + 1] = P1;
@@ -277,9 +296,11 @@ glm::vec3* HBSurface::get_vertices(){
                     P0 = P3;
                     N1 = N2;
                     N0 = N3;
+                    elem += 6;
                 }
             }
         }
+    }
     }
 
     return vert;
@@ -321,6 +342,8 @@ glm::vec3 HBSurface::get_cp_col(int idx){
     if (idx == sel_idx && selected == true){
         //std::cout << "what I think is selected " << idx << std::endl;
         return glm::vec3(1.0f, 0.0f, 0.0f);
+    } else if (idx == sel_idx_2 && selected == true){
+        return glm::vec3(0.0f, 0.0f, 1.0f);
     } else {
         return glm::vec3(0.0f, 0.0f, 0.0f);
     }
@@ -330,20 +353,43 @@ glm::vec3 HBSurface::get_selected_cp_coords(){
     return glm::vec3((*cpsx)(sel_cp_i, sel_cp_j), (*cpsy)(sel_cp_i, sel_cp_j), (*cpsz)(sel_cp_i, sel_cp_j));
 }
 
-void HBSurface::select_cp(int idx){
-    if (idx < ncps){
+void HBSurface::select_cp(int idx, bool second){
+    if (idx >= my_idx_start && idx < (my_idx_start + get_n_cps())){
+        std::cout << "running select idx " << idx << std::endl;
         selected = true;
-        sel_idx = idx;
-        sel_cp_i = idx/ncpx;
-        sel_cp_j = idx%ncpx;
+        if (second){
+            sel_idx_2 = idx;
+            sel_cp_i_2 = (idx - my_idx_start)/ncpx;
+            sel_cp_j_2 = (idx - my_idx_start)%ncpx;
+        } else {
+            sel_idx = idx;
+            sel_cp_i = (idx - my_idx_start)/ncpx;
+            sel_cp_j = (idx - my_idx_start)%ncpx;
+        }
+    } else {
+        selected = false;
+        sel_idx = -1;
+        sel_idx_2 = -1;
+    }
+
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        (*child)->select_cp(idx, second);
     }
 }
 
 void HBSurface::move_selected_cp(glm::vec3 delta){
     //Require delta to be CP's coordinates
-    (*cpsx)(sel_cp_i, sel_cp_j) = delta.x;
-    (*cpsy)(sel_cp_i, sel_cp_j) = delta.y;
-    (*cpsz)(sel_cp_i, sel_cp_j) = delta.z;
+    if(selected){
+        if (glm::length(delta) < 1000){
+            (*cpsx)(sel_cp_i, sel_cp_j) = delta.x;
+            (*cpsy)(sel_cp_i, sel_cp_j) = delta.y;
+            (*cpsz)(sel_cp_i, sel_cp_j) = delta.z;
+        }
+    } else {
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            (*child)->move_selected_cp(delta);
+        }
+    }
 }
 
 void HBSurface::split_patch(int i, int j, Matrix5f& X, Matrix5f& Y, Matrix5f& Z){
@@ -393,37 +439,62 @@ void HBSurface::split_patch(int i, int j, Matrix5f& X, Matrix5f& Y, Matrix5f& Z)
 }
 
 void HBSurface::split_selected_cp(){
-    std::cout << "Adding new surface." << std::endl;
     Matrix5f X, Y, Z; // individual refined patches
-    Matrix7f RX, RY, RZ; // refined points about central point
-    split_patch(sel_cp_i, sel_cp_j, X, Y, Z);
-    RX.block<5,5>(0,0) = X;
-    RY.block<5,5>(0,0) = Y;
-    RZ.block<5,5>(0,0) = Z;
-    split_patch(sel_cp_i+1, sel_cp_j, X, Y, Z );
-    RX.block<5,5>(2,0) = X;
-    RY.block<5,5>(2,0) = Y;
-    RZ.block<5,5>(2,0) = Z;
-    split_patch(sel_cp_i, sel_cp_j+1, X, Y, Z);
-    RX.block<5,5>(0,2) = X;
-    RY.block<5,5>(0,2) = Y;
-    RZ.block<5,5>(0,2) = Z;
-    split_patch(sel_cp_i+1, sel_cp_j+1, X, Y, Z);
-    RX.block<5,5>(2,2) = X;
-    RY.block<5,5>(2,2) = Y;
-    RZ.block<5,5>(2,2) = Z;
+    int dim_x, dim_y;
 
+    dim_x = 7 + std::abs(sel_cp_i - sel_cp_i_2)*2;
+    dim_y = 7 + std::abs(sel_cp_j - sel_cp_j_2)*2;
+
+    std::cout << "Adding new surface." << std::endl;
+    std::cout << "Dim " << dim_x << " by " << dim_y << " control points." << std::endl;
+
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RX(dim_x, dim_y);
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RY(dim_x, dim_y);
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RZ(dim_x, dim_y);
+
+    int i_start, i_end, j_start, j_end;
+
+    if ( sel_cp_i < sel_cp_i_2 ){
+        i_start = sel_cp_i;
+        i_end = sel_cp_i_2;
+    } else {
+        i_start = sel_cp_i_2;
+        i_end = sel_cp_i;
+    }
+
+    if ( sel_cp_j < sel_cp_j_2 ){
+        j_start = sel_cp_j;
+        j_end = sel_cp_j_2;
+    } else {
+        j_start = sel_cp_j_2;
+        j_end = sel_cp_j;
+    }
+
+    for (int i = i_start; i <= (i_end+1); i++){
+        for (int j = j_start; j <= (j_end+1); j++){
+            split_patch(i, j, X, Y, Z);
+            RX.block<5,5>((i-i_start)*2, (j-j_start)*2) = X;
+            RY.block<5,5>((i-i_start)*2, (j-j_start)*2) = Y;
+            RZ.block<5,5>((i-i_start)*2, (j-j_start)*2) = Z;
+        }
+    }
+
+    int pdim_x = std::abs(sel_cp_i - sel_cp_i_2)+2;
+    int pdim_y = std::abs(sel_cp_j - sel_cp_j_2)+2;
+    std::cout << "Dim " << pdim_x << " by " << pdim_y << " patches." << std::endl;
+
+    npatches -= pdim_x * pdim_y;
     has_children = true;
-    HBSurface* new_surface = new HBSurface(GLapp, 4,4, res);
+    HBSurface* new_surface = new HBSurface(GLapp, m_shader, b_shader, 2*pdim_x, 2*pdim_y, res);
     (*new_surface->cpsx) = RX;
     (*new_surface->cpsy) = RY;
     (*new_surface->cpsz) = RZ;
     child_list.push_back(new_surface);
 
     //This for checking patches
-    for (int i = -2; i <= -1; i++){
-        for (int j = -2; j <= -1; j++){
-            children[sel_cp_i+i][sel_cp_j+j] = new_surface;
+    for (int i = -2; i <= -1 + (i_end-i_start); i++){
+        for (int j = -2; j <= -1 + (j_end - j_start); j++){
+            children[i_start+i][j_start+j] = new_surface;
         }
     }
 
@@ -432,7 +503,16 @@ void HBSurface::split_selected_cp(){
 }
 
 unsigned int HBSurface::get_selected_cp_idx(){
-    return sel_idx;
+    if (sel_idx >= 0){
+        return sel_idx;
+    } else {
+        int child_idx;
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            child_idx = (*child)->get_selected_cp_idx();
+            if (child_idx >= 0)
+                return child_idx;
+        }
+    }
 }
 
 unsigned int HBSurface::get_n_cps(){

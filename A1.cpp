@@ -63,7 +63,7 @@ void A1::init()
 	light_colour = m_shader.getUniformLocation("light.rgbIntensity");
 	light_ambient = m_shader.getUniformLocation("ambientIntensity");
 
-	surface = new HBSurface(this, npx, npy, 16);
+	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, 16);
 
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
@@ -172,7 +172,7 @@ void A1::draw()
 	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
 	updateLighting();
 
-	surface->render(m_shader, b_shader, W, proj, view, do_picking);
+	surface->render(W, proj, view, do_picking);
 
 	// Restore defaults
 	glBindVertexArray( 0 );
@@ -302,9 +302,11 @@ int A1::pick_object(){
 	// Reassemble the object ID.
 	unsigned int what = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
 
-	//std::cout << "Selected idx " << what << std::endl;
+	std::cout << "Selected idx " << what << std::endl;
 
 	do_picking = false;
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	return what;
 }
@@ -323,8 +325,9 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 			dragging = true;
 
 			int what = pick_object();
-			if (what < surface->get_n_cps()){
-				surface->select_cp(what);
+			surface->select_cp(what, lctrl);
+
+			if (what == surface->get_selected_cp_idx()){
 				drag_cp = true;
 			} else {
 				drag_cp = false;
@@ -403,11 +406,23 @@ bool A1::keyInputEvent(int key, int action, int mods) {
 			eventHandled = true;
 		}
 
+		if (key == GLFW_KEY_LEFT_CONTROL){
+			lctrl = true;
+			eventHandled = true;
+		}
 
 		if (key == GLFW_KEY_P){
 			glm::vec3 coords = surface->get_selected_cp_coords();
 			std::cout << glm::to_string(coords) << std::endl;
 			eventHandled = true;
+		}
+	}
+
+	if (action == GLFW_RELEASE){
+		if (key = GLFW_KEY_LEFT_CONTROL){
+			std::cout << "released" << std::endl;
+			lctrl = false;
+			eventHandled = false;
 		}
 	}
 
