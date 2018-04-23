@@ -41,10 +41,13 @@ public:
     void update_cps();
     glm::vec3 get_selected_cp_coords();
     void update_references();
+    void set_mode_edit_cp(bool val);
 
     // Public variables
     int ncpx;
     int ncpy;
+    int npx;
+    int npy;
     Eigen::MatrixXf* Ocpsx;
     Eigen::MatrixXf* Ocpsy;
     Eigen::MatrixXf* Ocpsz;
@@ -70,7 +73,14 @@ private:
     void split();
     bool is_cp_mine(int idx);
     void get_split_reference(Eigen::MatrixXf& RX, Eigen::MatrixXf& RY, Eigen::MatrixXf& RZ, int cp_i, int cp_j, int cp_i_2, int cp_j_2);
+    glm::vec3 get_edit_point(int i, int j);
+    glm::vec3* get_edit_vertices();
+    unsigned int get_n_eps();
+    unsigned int get_n_ep_vertices();
+    unsigned int get_ep_vertices_size();
+    glm::vec3 get_ep_col(int idx);
 
+    bool edit_cp_mode = false;
     int my_idx_start = idx_start;
     bool has_parent = false;
     bool has_children = false;
@@ -78,8 +88,6 @@ private:
     HBSurface*** children;
     HBSurface* parent;
     bool selected = false;
-    int npx;
-    int npy;
     int res;
     glm::vec3* Pbuffer;
     glm::vec3* Nbuffer;
@@ -98,11 +106,13 @@ private:
     glm::vec3* vert;
     glm::vec3* norm;
     glm::vec3* cp_verts;
+    glm::vec3* ep_verts;
     unsigned int nvert = 0;
     unsigned int n_cp_verts = 0;
     unsigned int ncps = 0;
     bool refined = true;
     bool refinedcps = true;
+    bool refinedeps = true;
 
     //OpenGL parameters
     ShaderProgram* m_shader;

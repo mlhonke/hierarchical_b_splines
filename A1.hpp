@@ -39,14 +39,15 @@ private:
 	float depth_val;
 	bool depth_set = false;
 	bool drag_cp = false;
+	bool edit_cp = false;
 
 	//Fields for object picking
 	bool do_picking = false;
 	bool lctrl = false;
 
 	// Fields related to surface properties
-	int npx = 7;
-	int npy = 7;
+	int npx = 8;
+	int npy = 8;
 	int level = -1;
 
 	// Fields related to the shader and uniforms.

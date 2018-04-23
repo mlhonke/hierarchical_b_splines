@@ -118,10 +118,17 @@ void HBSurface::init_render(){
 void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking, int level){
     update_cps();
     if (level <= 0){
+        int n_points;
         //CP vertices
         glBindVertexArray(m_cp_vao);
         glBindBuffer(GL_ARRAY_BUFFER, m_cp_vbo);
-        glBufferData(GL_ARRAY_BUFFER, get_cp_vertices_size(), get_cp_vertices(), GL_DYNAMIC_DRAW);
+        if (edit_cp_mode && level == 0){
+            glBufferData(GL_ARRAY_BUFFER, get_ep_vertices_size(), get_edit_vertices(), GL_DYNAMIC_DRAW);
+            n_points = get_n_eps();
+        } else {
+            glBufferData(GL_ARRAY_BUFFER, get_cp_vertices_size(), get_cp_vertices(), GL_DYNAMIC_DRAW);
+            n_points = get_n_cps();
+        }
         glEnableVertexAttribArray( posAttrib2 );
         glVertexAttribPointer( posAttrib2, 3, GL_FLOAT, GL_FALSE, 0, nullptr );
 
@@ -138,8 +145,9 @@ void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool 
             glUniformMatrix4fv( V_uni, 1, GL_FALSE, value_ptr( view ) );
             glUniformMatrix4fv( M_uni, 1, GL_FALSE, value_ptr( W ) );
             glBindVertexArray( m_cp_vao );
+
             if (do_picking){
-                for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
+                for (int idx = my_idx_start; idx < (n_points + my_idx_start); idx++){
                     float r = float(idx&0xff) / 255.0f;
                     float g = float((idx>>8)&0xff) / 255.0f;
                     float b = float((idx>>16)&0xff) / 255.0f;
@@ -147,8 +155,13 @@ void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool 
                     glDrawArrays(GL_TRIANGLES, (idx-my_idx_start)*36, 36);
                 }
             } else {
-                for (int idx = my_idx_start; idx < (get_n_cps() + my_idx_start); idx++){
-                    glm::vec3 cp_col = get_cp_col(idx);
+                for (int idx = my_idx_start; idx < (n_points + my_idx_start); idx++){
+                    glm::vec3 cp_col;
+                    if (edit_cp_mode && level == 0){
+                        cp_col = get_ep_col(idx);
+                    } else {
+                        cp_col = get_cp_col(idx);
+                    }
                     glUniform3f( col_uni, cp_col.x, cp_col.y, cp_col.z );
                     glDrawArrays( GL_TRIANGLES, (idx-my_idx_start)*36, 36);
                 }
@@ -309,37 +322,37 @@ glm::vec3* HBSurface::get_vertices(){
                     Pbuffer[fxy(xp, yp)] =  C;
 
                     //Find the normal
-                    // glm::vec3 A0, A1;
-                    // glm::vec3 B0, B1;
-                    // float sign = -1.0f;
-                    // if (xp == res && i < (npx-1)){
-                    //     A0 = eval_point(i+1,j, h, v);
-                    //     A1 = eval_point(i, j, u-h, v);
-                    //     //sign *= -1.0f;
-                    // } else if (xp == res){
-                    //     A0 = eval_point(i, j, u, v);
-                    //     A1 = eval_point(i, j, u-h, v);
-                    //     //sign *= -1.0f;
-                    // } else {
-                    //     A0 = eval_point(i,j, u+h, v);
-                    //     A1 = eval_point(i, j, u-h, v);
-                    // }
-                    // if (yp == res && j < (npy-1)){
-                    //     B0 = eval_point(i, j+1, u, h);
-                    //     B1 = eval_point(i, j, u, v-h);
-                    //     //sign *= -1.0f;
-                    // } else if (yp == res){
-                    //     B0 = eval_point(i, j, u, v);
-                    //     B1 = eval_point(i, j, u, v-h);
-                    //     //sign *= -1.0f;
-                    // }else {
-                    //     B0 = eval_point(i,j, u, v+h);
-                    //     B1 = eval_point(i, j, u, v-h);
-                    // }
-                    // Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                    glm::vec3 A0, A1;
+                    glm::vec3 B0, B1;
+                    float sign = -1.0f;
+                    if (xp == res && i < (npx-1)){
+                        A0 = eval_point(i+1,j, h, v);
+                        A1 = eval_point(i, j, u-h, v);
+                        //sign *= -1.0f;
+                    } else if (xp == res){
+                        A0 = eval_point(i, j, u, v);
+                        A1 = eval_point(i, j, u-h, v);
+                        //sign *= -1.0f;
+                    } else {
+                        A0 = eval_point(i,j, u+h, v);
+                        A1 = eval_point(i, j, u-h, v);
+                    }
+                    if (yp == res && j < (npy-1)){
+                        B0 = eval_point(i, j+1, u, h);
+                        B1 = eval_point(i, j, u, v-h);
+                        //sign *= -1.0f;
+                    } else if (yp == res){
+                        B0 = eval_point(i, j, u, v);
+                        B1 = eval_point(i, j, u, v-h);
+                        //sign *= -1.0f;
+                    }else {
+                        B0 = eval_point(i,j, u, v+h);
+                        B1 = eval_point(i, j, u, v-h);
+                    }
+                    Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                     //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                     //std::cout << "NA " << glm::to_string(result) << std::endl;
-                    Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
+                    //Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
                     //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
                 }
             }
@@ -386,6 +399,50 @@ glm::vec3* HBSurface::get_vertices(){
     return vert;
 }
 
+void HBSurface::set_mode_edit_cp(bool val){
+    if (val == true){
+        edit_cp_mode = true;
+    } else {
+        edit_cp_mode = false;
+    }
+
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        (*child)->set_mode_edit_cp(val);
+    }
+}
+
+glm::vec3 HBSurface::get_edit_point(int i, int j){
+    float P[3];
+    Eigen::MatrixXf* CP [3] = {cpsx, cpsy, cpsz};
+
+    for (int k = 0; k < 3; k++){
+        P[k] =  (1.0f/6.0f)*((1.0f/6.0f)*(*CP[k])(i-1, j-1) + (4.0f/6.0f)*(*CP[k])(i, j-1) + (1.0f/6.0f)*(*CP[k])(i+1, j-1)) +
+                (4.0f/6.0f)*((1.0f/6.0f)*(*CP[k])(i-1, j) + (4.0f/6.0f)*(*CP[k])(i, j) + (1.0f/6.0f)*(*CP[k])(i+1, j)) +
+                (1.0f/6.0f)*((1.0f/6.0f)*(*CP[k])(i-1, j+1) + (4.0f/6.0f)*(*CP[k])(i, j+1) + (1.0f/6.0f)*(*CP[k])(i+1, j+1));
+    }
+
+    return glm::vec3(P[0], P[1], P[2]);
+}
+
+glm::vec3* HBSurface::get_edit_vertices(){
+    if (refinedeps){
+        refinedeps = false;
+        ep_verts = new glm::vec3[get_n_ep_vertices()];
+    }
+
+    for (int i = 1; i < (ncpx-1); i++){
+        for (int j = 1; j < (ncpy-1); j++){
+            glm::vec3 P = get_edit_point(i,j);
+            Cube EP(P.x, P.y, P.z);
+            for (int k = 0; k < 36; k++){
+                ep_verts[36*((i-1)*(ncpx-2) + (j-1)) + k] = EP.get_vertices()[k];
+            }
+        }
+    }
+
+    return ep_verts;
+}
+
 glm::vec3* HBSurface::get_cp_vertices(){
     if (refinedcps){
         if (n_cp_verts != 0){
@@ -418,12 +475,30 @@ bool HBSurface::is_cp_selected(){
     return selected;
 }
 
+glm::vec3 HBSurface::get_ep_col(int idx){
+    int x = (idx - my_idx_start)/(ncpx-2) + 1;
+    int y = (idx - my_idx_start)%(ncpx-2) + 1;
+
+    if (idx == sel_idx && selected == true){
+        return glm::vec3(1.0f, 0.0f, 0.0f);
+    } else if ((*cpmask)(x,y) != 1){
+        return glm::vec3(0.5f, 0.5f, 0.5f);
+    } else {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
 glm::vec3 HBSurface::get_cp_col(int idx){
+    int x = (idx - my_idx_start)/ncpx;
+    int y = (idx - my_idx_start)%ncpx;
+
     if (idx == sel_idx && selected == true){
         //std::cout << "what I think is selected " << idx << std::endl;
         return glm::vec3(1.0f, 0.0f, 0.0f);
     } else if (idx == sel_idx_2 && selected == true){
         return glm::vec3(0.0f, 0.0f, 1.0f);
+    } else if ((*cpmask)(x,y) != 1){
+        return glm::vec3(0.5f, 0.5f, 0.5f);
     } else {
         return glm::vec3(0.0f, 0.0f, 0.0f);
     }
@@ -443,9 +518,15 @@ void HBSurface::select_cp(int idx, bool second, int level){
                 sel_cp_i_2 = (idx - my_idx_start)/ncpx;
                 sel_cp_j_2 = (idx - my_idx_start)%ncpx;
             } else {
-                sel_idx = idx;
-                sel_cp_i = (idx - my_idx_start)/ncpx;
-                sel_cp_j = (idx - my_idx_start)%ncpx;
+                if(edit_cp_mode){
+                    sel_idx = idx;
+                    sel_cp_i = (idx - my_idx_start)/(ncpx-2);
+                    sel_cp_j = (idx - my_idx_start)%(ncpx-2);
+                } else {
+                    sel_idx = idx;
+                    sel_cp_i = (idx - my_idx_start)/ncpx;
+                    sel_cp_j = (idx - my_idx_start)%ncpx;
+                }
             }
         } else {
             selected = false;
@@ -473,11 +554,24 @@ bool HBSurface::is_cp_mine(int idx){
 void HBSurface::move_selected_cp(glm::vec3 delta){
     //Require delta to be CP's coordinates
     if(selected){
-        if ( glm::length(delta) < 1000  && ((*cpmask)(sel_cp_i, sel_cp_j) == 1) ){
-            (*Ocpsx)(sel_cp_i, sel_cp_j) = delta.x - (*Rcpsx)(sel_cp_i, sel_cp_j);
-            (*Ocpsy)(sel_cp_i, sel_cp_j) = delta.y - (*Rcpsy)(sel_cp_i, sel_cp_j);
-            (*Ocpsz)(sel_cp_i, sel_cp_j) = delta.z - (*Rcpsz)(sel_cp_i, sel_cp_j);
-            update_cps();
+        if (edit_cp_mode){
+            int i = sel_cp_i+1;
+            int j = sel_cp_j+1;
+            if ( glm::length(delta) < 1000 && ((*cpmask)(i, j) == 1) ){
+                glm::vec3 P = get_edit_point(i, j);
+                glm::vec3 V( (*cpsx)(i, j), (*cpsy)(i, j), (*cpsz)(i, j) );
+                glm::vec3 D = (36.0f/16.0f)*(delta - P) + V;
+                (*Ocpsx)(i, j) = D.x - (*Rcpsx)(i, j);
+                (*Ocpsy)(i, j) = D.y - (*Rcpsy)(i, j);
+                (*Ocpsz)(i, j) = D.z - (*Rcpsz)(i, j);
+            }
+        } else {
+            if ( glm::length(delta) < 1000  && ((*cpmask)(sel_cp_i, sel_cp_j) == 1) ){
+                (*Ocpsx)(sel_cp_i, sel_cp_j) = delta.x - (*Rcpsx)(sel_cp_i, sel_cp_j);
+                (*Ocpsy)(sel_cp_i, sel_cp_j) = delta.y - (*Rcpsy)(sel_cp_i, sel_cp_j);
+                (*Ocpsz)(sel_cp_i, sel_cp_j) = delta.z - (*Rcpsz)(sel_cp_i, sel_cp_j);
+                update_cps();
+            }
         }
 
         update_references();
@@ -628,6 +722,65 @@ void HBSurface::split(){
         j_end = sel_cp_j;
     }
 
+
+    // Go through all children and find conflicting patches on this level.
+    std::vector<HBSurface*> adjacent_children;
+    bool adjacent_exists = false;
+    int max_ci, max_cj, min_ci, min_cj;
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        bool adjacent = false;
+        int ci_start = (*child)->parent_sel_cp_i;
+        int cj_start = (*child)->parent_sel_cp_j;
+        int ci_end = (*child)->parent_sel_cp_i_2;
+        int cj_end = (*child)->parent_sel_cp_j_2;
+
+        if (child == child_list.begin()){
+            max_ci = i_end;
+            max_cj = j_end;
+            min_ci = i_start;
+            min_cj = j_start;
+        }
+
+        for (int i = i_start; i <= i_end; i++){
+            for (int j = j_start; j <= j_end; j++){
+                for (int k = ci_start; k <= ci_end; k++){
+                    for (int l = cj_start; l <= cj_end; l++){
+                        if ( std::abs(k - i) <= 1 && std::abs(l - j) <= 1 ){
+                            adjacent = true;
+                            adjacent_exists = true;
+                            std::cout << "Found adjacent surface to combine with." << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+
+        if(adjacent){
+            adjacent_children.push_back(*child);
+
+            if (ci_start < min_ci){
+                min_ci = ci_start;
+            }
+            if (cj_start < min_cj){
+                min_cj = cj_start;
+            }
+            if (ci_end > max_ci){
+                max_ci = ci_end;
+            }
+            if (cj_end > max_cj){
+                max_cj = cj_end;
+            }
+        }
+    }
+
+    if( adjacent_exists){
+        std::cout << "Creating new combined surface " << min_ci << "," << min_cj << " to " << max_ci << "," << max_cj << std::endl;
+        sel_cp_i = min_ci;
+        sel_cp_j = min_cj;
+        sel_cp_i_2 = max_ci;
+        sel_cp_j_2 = max_cj;
+    }
+
     int dim_x, dim_y;
     dim_x = 7 + std::abs(sel_cp_i - sel_cp_i_2)*2;
     dim_y = 7 + std::abs(sel_cp_j - sel_cp_j_2)*2;
@@ -644,7 +797,7 @@ void HBSurface::split(){
     int pdim_x = std::abs(sel_cp_i - sel_cp_i_2)+2;
     int pdim_y = std::abs(sel_cp_j - sel_cp_j_2)+2;
     std::cout << "Dim " << pdim_x << " by " << pdim_y << " patches." << std::endl;
-    npatches -= pdim_x * pdim_y;
+    npatches -= pdim_x * pdim_y; //Needs to be updated when deleting a sub surface.
 
     // Set up the child.
     has_children = true;
@@ -673,6 +826,10 @@ void HBSurface::split(){
         }
     }
 
+    for (std::vector<HBSurface*>::iterator child = adjacent_children.begin(); child != adjacent_children.end(); child++){
+        
+    }
+
     std::cout << "Completed Split" << std::endl;
     // std::cout << RX << std::endl << std::endl;
     // std::cout << RZ << std::endl << std::endl;
@@ -689,6 +846,19 @@ unsigned int HBSurface::get_selected_cp_idx(){
                 return child_idx;
         }
     }
+}
+
+
+unsigned int HBSurface::get_n_eps(){
+    return (ncpy-2)*(ncpx-2);
+}
+
+unsigned int HBSurface::get_n_ep_vertices(){
+    return 36*get_n_eps();
+}
+
+unsigned int HBSurface::get_ep_vertices_size(){
+    return 3*get_n_ep_vertices()*sizeof(float);
 }
 
 unsigned int HBSurface::get_n_cps(){

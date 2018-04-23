@@ -45,7 +45,7 @@ if os.get() == "macosx" then
     linkOptionList = { "-framework IOKit", "-framework Cocoa", "-framework CoreVideo", "-framework OpenGL" }
 end
 
-buildOptions = {"-std=c++11"}
+buildOptions = {"-std=c++11 -fopenmp"}
 
 solution "CS488-Projects"
     configurations { "Debug", "Release" }

@@ -81,7 +81,7 @@ void A1::init()
 void A1::updateLighting(){
 	// Lighting
 	m_shader.enable();
-		glm::vec3 lpos(0.0f, 5.0f, 10.0f);
+		glm::vec3 lpos(0.0f, 10.0f, 0.0f);
 		glUniform3fv(light_position, 1, value_ptr(lpos));
 		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
 		glUniform3fv(light_colour, 1, value_ptr(lcol));
@@ -436,6 +436,14 @@ bool A1::keyInputEvent(int key, int action, int mods) {
 			if (level >= 0){
 				level--;
 			}
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_E){
+			edit_cp = !edit_cp;
+			surface->set_mode_edit_cp(edit_cp);
+			std::cout << "Setting edit points mode to " << edit_cp << std::endl;
+
 			eventHandled = true;
 		}
 	}
