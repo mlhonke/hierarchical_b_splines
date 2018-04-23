@@ -81,7 +81,7 @@ void A1::init()
 void A1::updateLighting(){
 	// Lighting
 	m_shader.enable();
-		glm::vec3 lpos(0.0f, 10.0f, 10.0f);
+		glm::vec3 lpos(0.0f, 5.0f, 10.0f);
 		glUniform3fv(light_position, 1, value_ptr(lpos));
 		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
 		glUniform3fv(light_colour, 1, value_ptr(lcol));
@@ -162,6 +162,7 @@ mat4 A1::get_W(){
 	mat4 W;
 	W = glm::rotate(W, rot_rads, vec3(0, 1, 0));
 	W = glm::scale(W, vec3(zoom, zoom, zoom));
+	W = glm::translate(W, vec3(- (surface->ncpx-1.0f)/2.0f, 0, - (surface->ncpy-1.0f)/2.0f));
 
 	return W;
 }
@@ -172,6 +173,8 @@ mat4 A1::get_W(){
  */
 void A1::draw()
 {
+	//std::cout << "New Render Cycle" << std::endl;
+	glfwSwapInterval(1);
 	// Create a global transformation for the model (centre it).
 	mat4 W;
 	W = get_W();

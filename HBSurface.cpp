@@ -24,21 +24,38 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
     cpsx = new Eigen::MatrixXf(ncpx, ncpy);
     cpsy = new Eigen::MatrixXf(ncpx, ncpy);
     cpsz = new Eigen::MatrixXf(ncpx, ncpy);
+    Rcpsx = new Eigen::MatrixXf(ncpx, ncpy);
+    Rcpsy = new Eigen::MatrixXf(ncpx, ncpy);
+    Rcpsz = new Eigen::MatrixXf(ncpx, ncpy);
+    (*Rcpsx) = Eigen::MatrixXf::Zero(ncpx, ncpy);
+    (*Rcpsy) = Eigen::MatrixXf::Zero(ncpx, ncpy);
+    (*Rcpsz) = Eigen::MatrixXf::Zero(ncpx, ncpy);
+    Ocpsx = new Eigen::MatrixXf(ncpx, ncpy);
+    Ocpsy = new Eigen::MatrixXf(ncpx, ncpy);
+    Ocpsz = new Eigen::MatrixXf(ncpx, ncpy);
+    (*Ocpsx) = Eigen::MatrixXf::Zero(ncpx, ncpy);
+    (*Ocpsy) = Eigen::MatrixXf::Zero(ncpx, ncpy);
+    (*Ocpsz) = Eigen::MatrixXf::Zero(ncpx, ncpy);
     cpmask = new Eigen::MatrixXi(ncpx, ncpy);
     *cpmask = Eigen::MatrixXi::Constant(ncpx, ncpy, 1);
 
-    idx_start += ncps;
     //std::cout << my_idx_start << std::endl;
     //std::cout << *cps << std::endl;
 
-    //Initialize all the control points
-    for(int i = 0; i<ncpx; i++){
-        for(int j = 0; j<ncpy; j++){
-            (*cpsx)(i,j) = i - (ncpx-1.0f)/2.0f;
-            (*cpsy)(i,j) = 0.0f;
-            (*cpsz)(i,j) = j - (ncpy-1.0f)/2.0f;
+    //Initialize all the control points only if first surface.
+    if (idx_start == 0){
+        for(int i = 0; i<ncpx; i++){
+            for(int j = 0; j<ncpy; j++){
+                (*Ocpsx)(i,j) = i;
+                (*Ocpsy)(i,j) = 0.0f;
+                (*Ocpsz)(i,j) = j;
+            }
         }
     }
+
+    idx_start += ncps;
+
+    update_cps();
 
     //(*cpsy)(3,3) = 3.0f;
 
@@ -58,8 +75,14 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
             0, 1.0f/2.0f, 1.0f/2.0f, 0,
             0, 1.0/8.0f, 3.0f/4.0f, 1.0f/8.0f,
             0, 0, 1.0f/2.0f, 1.0f/2.0f;
-    //init_test();
+    init_test();
     init_render();
+}
+
+void HBSurface::update_cps(){
+    *cpsx = *Ocpsx + *Rcpsx;
+    *cpsy = *Ocpsy + *Rcpsy;
+    *cpsz = *Ocpsz + *Rcpsz;
 }
 
 void HBSurface::init_render(){
@@ -93,6 +116,7 @@ void HBSurface::init_render(){
 }
 
 void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking, int level){
+    update_cps();
     if (level <= 0){
         //CP vertices
         glBindVertexArray(m_cp_vao);
@@ -142,6 +166,7 @@ void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool 
 }
 
 void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
+    update_cps();
     //Render surface vertices
     glBindVertexArray(m_surface_vao);
 
@@ -166,7 +191,6 @@ void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool
     m_shader->enable();
         glEnable( GL_DEPTH_TEST );
         glEnable( GL_CULL_FACE );
-        glfwSwapInterval(1);
 
         glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
         mat4 M = view * W;
@@ -196,6 +220,7 @@ void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool
 
 void HBSurface::init_test(){
     eval_point(0,0,1,1);
+    eval_normal(1,1,0,0);
 }
 
 glm::vec3 HBSurface::eval_point(int x, int y, float u, float v){
@@ -214,6 +239,45 @@ glm::vec3 HBSurface::eval_point(int x, int y, float u, float v){
     glm::vec3 P(Px, Py, Pz);
 
     return P;
+}
+
+glm::vec3 HBSurface::eval_normal(int x, int y, float u, float v){
+    Eigen::Matrix4f Vx = (*cpsx).block<4,4>(x, y);
+    Eigen::Matrix4f Vy = (*cpsy).block<4,4>(x, y);
+    Eigen::Matrix4f Vz = (*cpsz).block<4,4>(x, y);
+
+    // Take derivative along U.
+    Eigen::Vector4f U(0, 1, 2.0f*u, 3.0f*u*u);
+    Eigen::Vector4f V(1, v, v*v, v*v*v);
+
+    float Px = U.transpose()*B*Vx*B.transpose()*V;
+    float Py = U.transpose()*B*Vy*B.transpose()*V;
+    float Pz = U.transpose()*B*Vz*B.transpose()*V;
+
+    glm::vec3 Du(Px, Py, Pz);
+
+    // Take derivative along V.
+    V = Eigen::Vector4f(0, 1, 2.0f*v, 3.0f*v*v);
+    U = Eigen::Vector4f(1, u, u*u, u*u*u);
+
+    //std::cout << U << std::endl;
+
+    Px = U.transpose()*B*Vx*B.transpose()*V;
+    Py = U.transpose()*B*Vy*B.transpose()*V;
+    Pz = U.transpose()*B*Vz*B.transpose()*V;
+
+    glm::vec3 Dv(Px, Py, Pz);
+
+    // Calculate the normal from derivatives.
+    glm::vec3 P = eval_point(x, y, u, v);
+    glm::vec3 A = P + Du;
+    glm::vec3 B = P + Dv;
+    glm::vec3 N = -glm::normalize(glm::cross(A, B));
+
+    //std::cout << "P " << glm::to_string(P) << std::endl;
+    //std::cout << "N " << glm::to_string(N) << std::endl << std::endl;
+
+    return N;
 }
 
 glm::vec3* HBSurface::get_vertices(){
@@ -244,35 +308,38 @@ glm::vec3* HBSurface::get_vertices(){
                     glm::vec3 C = eval_point(i, j, u, v);
                     Pbuffer[fxy(xp, yp)] =  C;
 
-                    // Find the normal
-                    glm::vec3 A0, A1;
-                    glm::vec3 B0, B1;
-                    float sign = -1.0f;
-                    if (xp == res && i < (npx-1)){
-                        A0 = eval_point(i+1,j, h, v);
-                        A1 = eval_point(i, j, u-h, v);
-                        //sign *= -1.0f;
-                    } else if (xp == res){
-                        A0 = eval_point(i, j, u, v);
-                        A1 = eval_point(i, j, u-h, v);
-                        //sign *= -1.0f;
-                    } else {
-                        A0 = eval_point(i,j, u+h, v);
-                        A1 = eval_point(i, j, u-h, v);
-                    }
-                    if (yp == res && j < (npy-1)){
-                        B0 = eval_point(i, j+1, u, h);
-                        B1 = eval_point(i, j, u, v-h);
-                        //sign *= -1.0f;
-                    } else if (yp == res){
-                        B0 = eval_point(i, j, u, v);
-                        B1 = eval_point(i, j, u, v-h);
-                        //sign *= -1.0f;
-                    }else {
-                        B0 = eval_point(i,j, u, v+h);
-                        B1 = eval_point(i, j, u, v-h);
-                    }
-                    Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                    //Find the normal
+                    // glm::vec3 A0, A1;
+                    // glm::vec3 B0, B1;
+                    // float sign = -1.0f;
+                    // if (xp == res && i < (npx-1)){
+                    //     A0 = eval_point(i+1,j, h, v);
+                    //     A1 = eval_point(i, j, u-h, v);
+                    //     //sign *= -1.0f;
+                    // } else if (xp == res){
+                    //     A0 = eval_point(i, j, u, v);
+                    //     A1 = eval_point(i, j, u-h, v);
+                    //     //sign *= -1.0f;
+                    // } else {
+                    //     A0 = eval_point(i,j, u+h, v);
+                    //     A1 = eval_point(i, j, u-h, v);
+                    // }
+                    // if (yp == res && j < (npy-1)){
+                    //     B0 = eval_point(i, j+1, u, h);
+                    //     B1 = eval_point(i, j, u, v-h);
+                    //     //sign *= -1.0f;
+                    // } else if (yp == res){
+                    //     B0 = eval_point(i, j, u, v);
+                    //     B1 = eval_point(i, j, u, v-h);
+                    //     //sign *= -1.0f;
+                    // }else {
+                    //     B0 = eval_point(i,j, u, v+h);
+                    //     B1 = eval_point(i, j, u, v-h);
+                    // }
+                    // Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                    //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                    //std::cout << "NA " << glm::to_string(result) << std::endl;
+                    Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
                     //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
                 }
             }
@@ -407,10 +474,13 @@ void HBSurface::move_selected_cp(glm::vec3 delta){
     //Require delta to be CP's coordinates
     if(selected){
         if ( glm::length(delta) < 1000  && ((*cpmask)(sel_cp_i, sel_cp_j) == 1) ){
-            (*cpsx)(sel_cp_i, sel_cp_j) = delta.x;
-            (*cpsy)(sel_cp_i, sel_cp_j) = delta.y;
-            (*cpsz)(sel_cp_i, sel_cp_j) = delta.z;
+            (*Ocpsx)(sel_cp_i, sel_cp_j) = delta.x - (*Rcpsx)(sel_cp_i, sel_cp_j);
+            (*Ocpsy)(sel_cp_i, sel_cp_j) = delta.y - (*Rcpsy)(sel_cp_i, sel_cp_j);
+            (*Ocpsz)(sel_cp_i, sel_cp_j) = delta.z - (*Rcpsz)(sel_cp_i, sel_cp_j);
+            update_cps();
         }
+
+        update_references();
     } else {
         for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
             (*child)->move_selected_cp(delta);
@@ -418,7 +488,36 @@ void HBSurface::move_selected_cp(glm::vec3 delta){
     }
 }
 
+void HBSurface::update_references(){
+    int dim_x, dim_y;
+    //std::cout << "Updating References" << std::endl;
+
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        dim_x = 7 + std::abs((*child)->parent_sel_cp_i - (*child)->parent_sel_cp_i_2)*2;
+        dim_y = 7 + std::abs((*child)->parent_sel_cp_j - (*child)->parent_sel_cp_j_2)*2;
+        //std::cout << "Updating a child" << std::endl;
+
+        Eigen::MatrixXf RX(dim_x, dim_y);
+        Eigen::MatrixXf RY(dim_x, dim_y);
+        Eigen::MatrixXf RZ(dim_x, dim_y);
+
+        get_split_reference(RX, RY, RZ, (*child)->parent_sel_cp_i, (*child)->parent_sel_cp_j, (*child)->parent_sel_cp_i_2, (*child)->parent_sel_cp_j_2);
+
+        *((*child)->Rcpsx) = RX;
+        *((*child)->Rcpsy) = RY;
+        *((*child)->Rcpsz) = RZ;
+        (*child)->update_cps();
+
+        //std::cout << "Done updating a child" << std::endl;
+    }
+
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        (*child)->update_references();
+    }
+}
+
 void HBSurface::split_patch(int i, int j, Matrix5f& X, Matrix5f& Y, Matrix5f& Z){
+    update_cps();
     Eigen::Matrix4f Vx = (*cpsx).block<4,4>(i-2, j-2);
     Eigen::Matrix4f Vy = (*cpsy).block<4,4>(i-2, j-2);
     Eigen::Matrix4f Vz = (*cpsz).block<4,4>(i-2, j-2);
@@ -474,24 +573,42 @@ void HBSurface::split_selected_cp(){
     }
 }
 
+void HBSurface::get_split_reference(Eigen::MatrixXf& RX, Eigen::MatrixXf& RY, Eigen::MatrixXf& RZ, int cp_i, int cp_j, int cp_i_2, int cp_j_2){
+    Matrix5f X, Y, Z; // individual refined patches
+
+    int i_start, i_end, j_start, j_end;
+
+    if ( cp_i < cp_i_2 ){
+        i_start = cp_i;
+        i_end = cp_i_2;
+    } else {
+        i_start = cp_i_2;
+        i_end = cp_i;
+    }
+
+    if ( cp_j < cp_j_2 ){
+        j_start = cp_j;
+        j_end = cp_j_2;
+    } else {
+        j_start = cp_j_2;
+        j_end = cp_j;
+    }
+
+    for (int i = i_start; i <= (i_end+1); i++){
+        for (int j = j_start; j <= (j_end+1); j++){
+            split_patch(i, j, X, Y, Z);
+            (RX).block<5,5>((i-i_start)*2, (j-j_start)*2) = X;
+            (RY).block<5,5>((i-i_start)*2, (j-j_start)*2) = Y;
+            (RZ).block<5,5>((i-i_start)*2, (j-j_start)*2) = Z;
+        }
+    }
+}
+
 void HBSurface::split(){
     if (sel_idx_2 < 0){
         sel_cp_i_2 = sel_cp_i;
         sel_cp_j_2 = sel_cp_j;
     }
-
-    Matrix5f X, Y, Z; // individual refined patches
-    int dim_x, dim_y;
-
-    dim_x = 7 + std::abs(sel_cp_i - sel_cp_i_2)*2;
-    dim_y = 7 + std::abs(sel_cp_j - sel_cp_j_2)*2;
-
-    std::cout << "Adding new surface." << std::endl;
-    std::cout << "Dim " << dim_x << " by " << dim_y << " control points." << std::endl;
-
-    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RX(dim_x, dim_y);
-    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RY(dim_x, dim_y);
-    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> RZ(dim_x, dim_y);
 
     int i_start, i_end, j_start, j_end;
 
@@ -511,30 +628,43 @@ void HBSurface::split(){
         j_end = sel_cp_j;
     }
 
-    for (int i = i_start; i <= (i_end+1); i++){
-        for (int j = j_start; j <= (j_end+1); j++){
-            split_patch(i, j, X, Y, Z);
-            RX.block<5,5>((i-i_start)*2, (j-j_start)*2) = X;
-            RY.block<5,5>((i-i_start)*2, (j-j_start)*2) = Y;
-            RZ.block<5,5>((i-i_start)*2, (j-j_start)*2) = Z;
-        }
-    }
+    int dim_x, dim_y;
+    dim_x = 7 + std::abs(sel_cp_i - sel_cp_i_2)*2;
+    dim_y = 7 + std::abs(sel_cp_j - sel_cp_j_2)*2;
+
+    std::cout << "Adding new surface." << std::endl;
+    std::cout << "Dim " << dim_x << " by " << dim_y << " control points." << std::endl;
+
+    Eigen::MatrixXf RX(dim_x, dim_y);
+    Eigen::MatrixXf RY(dim_x, dim_y);
+    Eigen::MatrixXf RZ(dim_x, dim_y);
+
+    get_split_reference(RX, RY, RZ, sel_cp_i, sel_cp_j, sel_cp_i_2, sel_cp_j_2);
 
     int pdim_x = std::abs(sel_cp_i - sel_cp_i_2)+2;
     int pdim_y = std::abs(sel_cp_j - sel_cp_j_2)+2;
     std::cout << "Dim " << pdim_x << " by " << pdim_y << " patches." << std::endl;
-
     npatches -= pdim_x * pdim_y;
+
+    // Set up the child.
     has_children = true;
     HBSurface* new_surface = new HBSurface(GLapp, m_shader, b_shader, 2*pdim_x, 2*pdim_y, res);
-    *new_surface->cpsx = RX;
-    *new_surface->cpsy = RY;
-    *new_surface->cpsz = RZ;
+    *(new_surface->Rcpsx) = RX;
+    *(new_surface->Rcpsy) = RY;
+    *(new_surface->Rcpsz) = RZ;
+    new_surface->parent_sel_cp_i = sel_cp_i;
+    new_surface->parent_sel_cp_j = sel_cp_j;
+    new_surface->parent_sel_cp_i_2 = sel_cp_i_2;
+    new_surface->parent_sel_cp_j_2 = sel_cp_j_2;
+    new_surface->update_cps();
     *new_surface->cpmask = Eigen::MatrixXi::Constant(dim_x, dim_y, 0);
     //std::cout << *new_surface->cpmask << std::endl;
     (*new_surface->cpmask).block(3, 3, dim_x - 6, dim_y - 6) = Eigen::MatrixXi::Constant(dim_x - 6, dim_y - 6, 1);
     //std::cout << *new_surface->cpmask << std::endl;
+    new_surface->has_parent = true;
+    new_surface->parent = this;
     child_list.push_back(new_surface);
+
 
     //This for checking patches
     for (int i = -2; i <= -1 + (i_end-i_start); i++){
@@ -543,6 +673,7 @@ void HBSurface::split(){
         }
     }
 
+    std::cout << "Completed Split" << std::endl;
     // std::cout << RX << std::endl << std::endl;
     // std::cout << RZ << std::endl << std::endl;
 }

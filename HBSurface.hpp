@@ -38,30 +38,45 @@ public:
     void move_selected_cp(glm::vec3 delta);
     void split_selected_cp();
     unsigned int get_selected_cp_idx();
+    void update_cps();
     glm::vec3 get_selected_cp_coords();
+    void update_references();
 
     // Public variables
+    int ncpx;
+    int ncpy;
+    Eigen::MatrixXf* Ocpsx;
+    Eigen::MatrixXf* Ocpsy;
+    Eigen::MatrixXf* Ocpsz;
+    Eigen::MatrixXi* cpmask;
+    Eigen::MatrixXf* Rcpsx;
+    Eigen::MatrixXf* Rcpsy;
+    Eigen::MatrixXf* Rcpsz;
     Eigen::MatrixXf* cpsx;
     Eigen::MatrixXf* cpsy;
     Eigen::MatrixXf* cpsz;
-    Eigen::MatrixXi* cpmask;
     GLFWwindow * m_window;
     static int idx_start;
+    int parent_sel_cp_i_2, parent_sel_cp_j_2, parent_sel_cp_j, parent_sel_cp_i;
 
 private:
     void init_render();
     A1* GLapp;
     void split_patch(int i, int j, Matrix5f& X, Matrix5f& Y, Matrix5f& Z);
     glm::vec3 eval_point(int x, int y, float u, float v);
+    glm::vec3 eval_normal(int x, int y, float u, float v);
     void init_test();
     unsigned int fxy(int x, int y);
     void split();
     bool is_cp_mine(int idx);
+    void get_split_reference(Eigen::MatrixXf& RX, Eigen::MatrixXf& RY, Eigen::MatrixXf& RZ, int cp_i, int cp_j, int cp_i_2, int cp_j_2);
 
     int my_idx_start = idx_start;
+    bool has_parent = false;
     bool has_children = false;
     std::vector<HBSurface*> child_list;
     HBSurface*** children;
+    HBSurface* parent;
     bool selected = false;
     int npx;
     int npy;
@@ -69,8 +84,6 @@ private:
     glm::vec3* Pbuffer;
     glm::vec3* Nbuffer;
     int npatches;
-    int ncpx;
-    int ncpy;
     int sel_cp_i;
     int sel_cp_j;
     int sel_cp_i_2;
