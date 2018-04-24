@@ -339,7 +339,9 @@ Release/HBSurface.o: ../HBSurface.cpp ../HBSurface.hpp \
  ../Eigen/src/Eigenvalues/RealQZ.h \
  ../Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
  ../Eigen/src/Eigenvalues/./RealQZ.h \
- ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp ../A1.hpp
+ ../Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../cube.hpp ../A1.hpp \
+ ../trackball.hpp ../events.hpp ../../shared/include/glm/gtx/io.hpp \
+ ../../shared/include/glm/gtx/io.inl
 
 ../HBSurface.hpp:
 
@@ -1144,3 +1146,11 @@ Release/HBSurface.o: ../HBSurface.cpp ../HBSurface.hpp \
 ../cube.hpp:
 
 ../A1.hpp:
+
+../trackball.hpp:
+
+../events.hpp:
+
+../../shared/include/glm/gtx/io.hpp:
+
+../../shared/include/glm/gtx/io.inl:

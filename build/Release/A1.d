@@ -220,7 +220,9 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
  ../../shared/include/GLFW/glfw3.h ../../shared/gl3w/GL/glcorearb.h \
  ../../shared/cs488-framework/OpenGLImport.hpp \
  ../../shared/gl3w/GL/gl3w.h \
- ../../shared/cs488-framework/ShaderProgram.hpp \
+ ../../shared/cs488-framework/ShaderProgram.hpp ../trackball.hpp \
+ ../events.hpp ../../shared/include/glm/gtx/io.hpp \
+ ../../shared/include/glm/gtx/io.inl \
  ../../shared/cs488-framework/GlErrorCheck.hpp ../../shared/imgui/imgui.h \
  ../../shared/imgui/imconfig.h ../HBSurface.hpp ../Eigen/Dense \
  ../Eigen/Core ../Eigen/src/Core/util/DisableStupidWarnings.h \
@@ -790,6 +792,14 @@ Release/A1.o: ../A1.cpp ../A1.hpp ../../shared/include/glm/glm.hpp \
 ../../shared/gl3w/GL/gl3w.h:
 
 ../../shared/cs488-framework/ShaderProgram.hpp:
+
+../trackball.hpp:
+
+../events.hpp:
+
+../../shared/include/glm/gtx/io.hpp:
+
+../../shared/include/glm/gtx/io.inl:
 
 ../../shared/cs488-framework/GlErrorCheck.hpp:
 

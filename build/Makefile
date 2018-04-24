@@ -66,7 +66,9 @@ endif
 OBJECTS := \
 	$(OBJDIR)/cube.o \
 	$(OBJDIR)/A1.o \
+	$(OBJDIR)/events.o \
 	$(OBJDIR)/HBSurface.o \
+	$(OBJDIR)/trackball.o \
 	$(OBJDIR)/Main.o \
 
 RESOURCES := \
@@ -134,7 +136,13 @@ $(OBJDIR)/cube.o: ../cube.cpp
 $(OBJDIR)/A1.o: ../A1.cpp
 	@echo $(notdir $<)
 	$(SILENT) $(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+$(OBJDIR)/events.o: ../events.cpp
+	@echo $(notdir $<)
+	$(SILENT) $(CXX) $(CXXFLAGS) -o "$@" -c "$<"
 $(OBJDIR)/HBSurface.o: ../HBSurface.cpp
+	@echo $(notdir $<)
+	$(SILENT) $(CXX) $(CXXFLAGS) -o "$@" -c "$<"
+$(OBJDIR)/trackball.o: ../trackball.cpp
 	@echo $(notdir $<)
 	$(SILENT) $(CXX) $(CXXFLAGS) -o "$@" -c "$<"
 $(OBJDIR)/Main.o: ../Main.cpp

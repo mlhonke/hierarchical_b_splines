@@ -64,24 +64,27 @@ void A1::init()
 	light_ambient = m_shader.getUniformLocation("ambientIntensity");
 
 	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, 16);
-
+	//Center the surface.
+	W_trans_center = glm::translate(W_trans_center, vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
+	W_trans = glm::translate(W_trans, vec3(0.0f, 0.0f, - 8.0f));
+	update_W();
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
 	view = glm::lookAt(
-		glm::vec3( -2.0f, 3.0f, 0.0f ),
 		glm::vec3( 0.0f, 0.0f, 0.0f ),
+		glm::vec3( 0.0f, 0.0f, -1.0f ),
 		glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
 	proj = glm::perspective(
 		glm::radians( 45.0f ),
 		float( m_framebufferWidth ) / float( m_framebufferHeight ),
-		1.0f, 1000.0f );
+		0.1f, 10000.0f );
 }
 
 void A1::updateLighting(){
 	// Lighting
 	m_shader.enable();
-		glm::vec3 lpos(0.0f, 10.0f, 0.0f);
+		glm::vec3 lpos(0.0f, 10.0f, 10.0f);
 		glUniform3fv(light_position, 1, value_ptr(lpos));
 		glm::vec3 lcol(0.8f, 0.8f, 0.8f);
 		glUniform3fv(light_colour, 1, value_ptr(lcol));
@@ -158,11 +161,13 @@ void A1::restart_app(){
 	old_rot_rads = 0.0f;
 }
 
-mat4 A1::get_W(){
-	mat4 W;
-	W = glm::rotate(W, rot_rads, vec3(0, 1, 0));
-	W = glm::scale(W, vec3(zoom, zoom, zoom));
-	W = glm::translate(W, vec3(- (surface->ncpx-1.0f)/2.0f, 0, - (surface->ncpy-1.0f)/2.0f));
+mat4 A1::update_W(){
+	//std::cout << "Updating W" << std::endl;
+	//std::cout << glm::to_string(W) << std::endl;
+	//std::cout << glm::to_string(W_rot) << std::endl;
+	W_scale = glm::scale(glm::mat4(), vec3(zoom, zoom, zoom));
+	//std::cout << glm::to_string(W) << std::endl;
+	W = W_trans*W_rot*W_scale*W_trans_center;
 
 	return W;
 }
@@ -176,8 +181,6 @@ void A1::draw()
 	//std::cout << "New Render Cycle" << std::endl;
 	glfwSwapInterval(0);
 	// Create a global transformation for the model (centre it).
-	mat4 W;
-	W = get_W();
 	//W = glm::translate( W, vec3( 0.0f, 0.0f, 0.0f ) );
 	updateLighting();
 
@@ -226,7 +229,7 @@ glm::vec3 A1::GetOGLPos(float x, float y, float depth)
 	winZ = depth;
 	glm::vec3 win(winX, winY, winZ);
 	glm::vec3 pos;
-	glm::mat4 modelview = view*get_W();
+	glm::mat4 modelview = view*W;
 
     pos = glm::unProject(win, modelview, proj, port);
 	//std::cout << pos.x << " " << pos.y << " " << pos.z << std::endl;
@@ -257,7 +260,8 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 	if (!ImGui::IsMouseHoveringAnyWindow()) {
 		// Rotate the model if mouse is being dragged.
 		if (dragging && !drag_cp){
-			rot_rads = old_rot_rads - 2*3.1415*(old_x - xPos)/m_framebufferWidth;
+			rotate_surface(xPos, yPos);
+			//rot_rads = old_rot_rads - 2*3.1415*(old_x - xPos)/m_framebufferWidth;
 		} else if (dragging && drag_cp == true){
 			//std::cout << xPos << " " << yPos << " " << old_x << " " << old_y << std::endl;
 			if (!depth_set){
@@ -276,6 +280,7 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 		// Track the position of the mouse in preparation for rotation.
 			old_x = xPos;
 			old_y = yPos;
+			W_rot_old = W_rot;
 		}
 	}
 	return eventHandled;
@@ -356,6 +361,27 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 	return eventHandled;
 }
 
+void A1::rotate_surface(float xPos, float yPos){
+	//std::cout << "Calling rotate surface" << std::endl;
+	xPos = 2.0f*xPos/m_framebufferWidth -1.0f;
+	yPos = -(2.0f*yPos/m_framebufferHeight -1.0f);
+	float xPos_old = 2.0f*old_x/m_framebufferWidth -1.0f;
+	float yPos_old = -(2.0f*old_y/m_framebufferHeight -1.0f);
+ 	float diameter = 2.2f;
+
+	//std::cout << xPos << " " << yPos <<
+
+	float fVecX, fVecY, fVecZ;
+	float* pfVecX = &fVecX;
+	float* pfVecY = &fVecY;
+	float* pfVecZ = &fVecZ;
+
+	vCalcRotVec(xPos, yPos, xPos_old, yPos_old, diameter, pfVecX, pfVecY, pfVecZ);
+	//std::cout << glm::to_string(vAxisRotMatrix(fVecX, fVecY, fVecZ)) << std::endl;
+	W_rot = vAxisRotMatrix(fVecX, fVecY, fVecZ) * W_rot_old;
+	update_W();
+}
+
 //----------------------------------------------------------------------------------------
 /*
  * Event handler.  Handles mouse scroll wheel events.
@@ -372,6 +398,8 @@ bool A1::mouseScrollEvent(double xOffSet, double yOffSet) {
 	if (yOffSet > 0 && zoom <= 2.0){
 		zoom += 0.05;
 	}
+
+	update_W();
 
 	return eventHandled;
 }

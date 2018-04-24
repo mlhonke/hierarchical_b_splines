@@ -7,6 +7,8 @@
 #include "cs488-framework/OpenGLImport.hpp"
 #include "cs488-framework/ShaderProgram.hpp"
 
+#include "trackball.hpp"
+
 class HBSurface;
 
 class A1 : public CS488Window {
@@ -32,7 +34,8 @@ protected:
 private:
 	void restart_app();
 	void updateLighting();
-	glm::mat4 get_W();
+	void rotate_surface(float xPos, float yPos);
+	glm::mat4 update_W();
 	int pick_object();
 	glm::vec3 GetOGLPos(float x, float y, float depth);
 	float getDepth(float x, float y);
@@ -40,6 +43,12 @@ private:
 	bool depth_set = false;
 	bool drag_cp = false;
 	bool edit_cp = false;
+	glm::mat4 W;
+	glm::mat4 W_rot;
+	glm::mat4 W_rot_old;
+	glm::mat4 W_trans;
+	glm::mat4 W_trans_center;
+	glm::mat4 W_scale;
 
 	//Fields for object picking
 	bool do_picking = false;

@@ -201,7 +201,7 @@ void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool
 
     m_shader->enable();
         glEnable( GL_DEPTH_TEST );
-        glEnable( GL_CULL_FACE );
+        glDisable( GL_CULL_FACE );
 
         glUniformMatrix4fv( Pers, 1, GL_FALSE, value_ptr( proj ) );
         mat4 M = view * W;
@@ -258,8 +258,8 @@ glm::vec3 HBSurface::eval_normal(int x, int y, float u, float v){
     Eigen::Matrix4f Vz = (*cpsz).block<4,4>(x, y);
 
     // Take derivative along U.
-    Eigen::Vector4f U(0, 1, 2.0f*u, 3.0f*u*u);
-    Eigen::Vector4f V(1, v, v*v, v*v*v);
+    Eigen::Vector4f U(0.0f, 1.0f, 2.0f*u, 3.0f*u*u);
+    Eigen::Vector4f V(1.0f, v, v*v, v*v*v);
 
     float Px = U.transpose()*B*Vx*B.transpose()*V;
     float Py = U.transpose()*B*Vy*B.transpose()*V;
@@ -268,8 +268,8 @@ glm::vec3 HBSurface::eval_normal(int x, int y, float u, float v){
     glm::vec3 Du(Px, Py, Pz);
 
     // Take derivative along V.
-    V = Eigen::Vector4f(0, 1, 2.0f*v, 3.0f*v*v);
-    U = Eigen::Vector4f(1, u, u*u, u*u*u);
+    V = Eigen::Vector4f(0.0f, 1.0f, 2.0f*v, 3.0f*v*v);
+    U = Eigen::Vector4f(1.0f, u, u*u, u*u*u);
 
     //std::cout << U << std::endl;
 
@@ -281,8 +281,8 @@ glm::vec3 HBSurface::eval_normal(int x, int y, float u, float v){
 
     // Calculate the normal from derivatives.
     glm::vec3 P = eval_point(x, y, u, v);
-    glm::vec3 A = P + Du;
-    glm::vec3 B = P + Dv;
+    glm::vec3 A = Du;
+    glm::vec3 B = Dv;
     glm::vec3 N = -glm::normalize(glm::cross(A, B));
 
     //std::cout << "P " << glm::to_string(P) << std::endl;
@@ -362,10 +362,10 @@ void HBSurface::gen_vertex_patch(int& elem, int i, int j){
                     B0 = eval_point(i,j, u, v+h);
                     B1 = eval_point(i, j, u, v-h);
                 }
-                Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                //Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                 //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                 //std::cout << "NA " << glm::to_string(result) << std::endl;
-                //Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
+                Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
                 //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
             }
         }
