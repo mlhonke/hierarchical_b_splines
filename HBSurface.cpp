@@ -463,7 +463,7 @@ glm::vec3* HBSurface::get_cp_vertices(){
             //std::cout << x << " " << y << " " << z << std::endl;
             Cube CP(x, y, z);
             for (int k = 0; k < 36; k++){
-                cp_verts[36*(i*ncpx + j) + k] = CP.get_vertices()[k];
+                cp_verts[36*(i*ncpy + j) + k] = CP.get_vertices()[k];
             }
         }
     }
@@ -489,8 +489,8 @@ glm::vec3 HBSurface::get_ep_col(int idx){
 }
 
 glm::vec3 HBSurface::get_cp_col(int idx){
-    int x = (idx - my_idx_start)/ncpx;
-    int y = (idx - my_idx_start)%ncpx;
+    int x = (idx - my_idx_start)/ncpy;
+    int y = (idx - my_idx_start)%ncpy;
 
     if (idx == sel_idx && selected == true){
         //std::cout << "what I think is selected " << idx << std::endl;
@@ -515,17 +515,17 @@ void HBSurface::select_cp(int idx, bool second, int level){
             selected = true;
             if (second){
                 sel_idx_2 = idx;
-                sel_cp_i_2 = (idx - my_idx_start)/ncpx;
-                sel_cp_j_2 = (idx - my_idx_start)%ncpx;
+                sel_cp_i_2 = (idx - my_idx_start)/ncpy;
+                sel_cp_j_2 = (idx - my_idx_start)%ncpy;
             } else {
                 if(edit_cp_mode){
                     sel_idx = idx;
-                    sel_cp_i = (idx - my_idx_start)/(ncpx-2);
-                    sel_cp_j = (idx - my_idx_start)%(ncpx-2);
+                    sel_cp_i = (idx - my_idx_start)/(ncpy-2);
+                    sel_cp_j = (idx - my_idx_start)%(ncpy-2);
                 } else {
                     sel_idx = idx;
-                    sel_cp_i = (idx - my_idx_start)/ncpx;
-                    sel_cp_j = (idx - my_idx_start)%ncpx;
+                    sel_cp_i = (idx - my_idx_start)/ncpy;
+                    sel_cp_j = (idx - my_idx_start)%ncpy;
                 }
             }
         } else {
@@ -816,6 +816,8 @@ void HBSurface::split(){
     //std::cout << *new_surface->cpmask << std::endl;
     new_surface->has_parent = true;
     new_surface->parent = this;
+    std::cout << "New surface has " << new_surface->get_n_cps() << " number of cps." << std::endl;
+    //std::cout << *new_surface->cpsx << std::endl;
     child_list.push_back(new_surface);
 
 
@@ -827,7 +829,23 @@ void HBSurface::split(){
     }
 
     for (std::vector<HBSurface*>::iterator child = adjacent_children.begin(); child != adjacent_children.end(); child++){
-        
+        std::cout << "Adding back " << (((*child)->npx)/2) * (((*child)->npy)/2) << " patches." << std::endl;
+        npatches += (((*child)->npx)/2) * (((*child)->npy)/2);
+        int i = 2*((*child)->parent_sel_cp_i - new_surface->parent_sel_cp_i);
+        int j = 2*((*child)->parent_sel_cp_j - new_surface->parent_sel_cp_j);
+
+        (*new_surface->Ocpsx).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsx;
+        (*new_surface->Ocpsy).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsy;
+        (*new_surface->Ocpsz).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsz;
+
+        for (std::vector<HBSurface*>::iterator childp = child_list.begin(); childp != child_list.end(); childp++){
+            if( *childp == *child ){
+                child_list.erase(childp);
+            }
+        }
+    }
+    if (adjacent_exists){
+        npatches++;
     }
 
     std::cout << "Completed Split" << std::endl;
@@ -862,7 +880,7 @@ unsigned int HBSurface::get_ep_vertices_size(){
 }
 
 unsigned int HBSurface::get_n_cps(){
-    return ncps;
+    return ncpy*ncpx;
 }
 
 unsigned int HBSurface::get_cp_vertices_size(){
