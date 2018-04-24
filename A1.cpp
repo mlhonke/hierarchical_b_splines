@@ -122,6 +122,22 @@ void A1::guiLogic()
 	float opacity(0.5f);
 
 	ImGui::Begin("Debug Window", &showDebugWindow, ImVec2(100,100), opacity, windowFlags);
+		std::vector<float *> col_list;
+		surface->get_colour(level, col_list);
+		int i = 0;
+		for( std::vector<float*>::iterator colour = col_list.begin(); colour != col_list.end(); colour++){
+			ImGui::PushID(i);
+			ImGui::ColorEdit3( "##Colour",  *colour);
+			ImGui::PopID();
+			i++;
+		}
+
+		if (level >= 0){
+			ImGui::Text( "Control Point Level: %d", level);
+		} else {
+			ImGui::Text( "Control Point Level: All");
+		}
+
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 		}
@@ -137,11 +153,6 @@ void A1::guiLogic()
 			showTestWindow = !showTestWindow;
 		}
 */
-		if (level >= 0){
-			ImGui::Text( "Control Point Level: %d", level);
-		} else {
-			ImGui::Text( "Control Point Level: All");
-		}
 
 		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
@@ -267,7 +278,7 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 			if (!depth_set){
 				depth_set = true;
 				depth_val = getDepth(xPos, yPos);
-				std::cout << "Depth Read" << std::endl;
+				//std::cout << "Depth Read" << std::endl;
 			}
 			GetOGLPos(old_x, old_y, depth_val);
 			glm::vec3 delta_model = GetOGLPos(xPos, yPos, depth_val);// - GetOGLPos(old_x, old_y);
@@ -317,7 +328,7 @@ int A1::pick_object(){
 	// Reassemble the object ID.
 	unsigned int what = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16);
 
-	std::cout << "Selected idx " << what << std::endl;
+	//std::cout << "Selected idx " << what << std::endl;
 
 	do_picking = false;
 

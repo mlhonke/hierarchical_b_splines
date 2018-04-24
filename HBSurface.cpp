@@ -5,13 +5,6 @@ int HBSurface::idx_start = 0;
 
 HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader, int npx, int npy, int res)
     : npx(npx), npy(npy), res(res), GLapp(GLapp), m_shader(m_shader), b_shader(b_shader){
-    children = new HBSurface**[npx];
-    for (int i = 0; i<npx; i++){
-        children[i] = new HBSurface*[npy];
-        for (int j=0; j<npy; j++){
-            children[i][j] = this;
-        }
-    }
 
     npatches = npx*npy;
     int m = npx + k - 2;
@@ -36,6 +29,12 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
     (*Ocpsz) = Eigen::MatrixXf::Zero(ncpx, ncpy);
     cpmask = new Eigen::MatrixXi(ncpx, ncpy);
     *cpmask = Eigen::MatrixXi::Constant(ncpx, ncpy, 1);
+    render_patch = new Eigen::MatrixXi(npx, npy);
+    *render_patch = Eigen::MatrixXi::Constant(npx, npy, 1);
+    colour = new float[3];
+    colour[0] = 0.5;
+    colour[1] = 0.7;
+    colour[2] = 0.5;
 
     threads = new std::thread[npx*npy];
 
@@ -211,7 +210,7 @@ void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool
         CHECK_GL_ERRORS;
 
         // Set Material values:
-        glm::vec3 kd(0.5f, 0.7f, 0.5f);
+        glm::vec3 kd(colour[0], colour[1], colour[2]);
         glUniform3fv(kd_location, 1, value_ptr(kd));
         glm::vec3 ks(0.5f, 0.5f, 0.5f);
         glUniform3fv(ks_location, 1, value_ptr(ks));
@@ -226,6 +225,17 @@ void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool
 
     for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
         (*child)->render_surface(W, proj, view, do_picking);
+    }
+}
+
+void HBSurface::get_colour(int level, std::vector<float *> &col_list){
+    if (level <= 0){
+        col_list.push_back(colour);
+    } else {
+        level--;
+        for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+            (*child)->get_colour(level, col_list);
+        }
     }
 }
 
@@ -325,7 +335,7 @@ void HBSurface::gen_vertex_patch(int& elem, int i, int j){
     glm::vec3 Pbuffer[(res+1)*(res+1)];
     glm::vec3 Nbuffer[(res+1)*(res+1)];
     float h = 0.001f;
-    if (children[i][j] == this){
+    if ((*render_patch)(i,j) == 1){
         //Iterate in the patch
         for (int xp = 0; xp <= res; xp++){
             float u = (float) xp / (float) res;
@@ -335,33 +345,33 @@ void HBSurface::gen_vertex_patch(int& elem, int i, int j){
                 Pbuffer[fxy(xp, yp)] =  C;
 
                 //Find the normal
-                glm::vec3 A0, A1;
-                glm::vec3 B0, B1;
-                float sign = -1.0f;
-                if (xp == res && i < (npx-1)){
-                    A0 = eval_point(i+1,j, h, v);
-                    A1 = eval_point(i, j, u-h, v);
-                    //sign *= -1.0f;
-                } else if (xp == res){
-                    A0 = eval_point(i, j, u, v);
-                    A1 = eval_point(i, j, u-h, v);
-                    //sign *= -1.0f;
-                } else {
-                    A0 = eval_point(i,j, u+h, v);
-                    A1 = eval_point(i, j, u-h, v);
-                }
-                if (yp == res && j < (npy-1)){
-                    B0 = eval_point(i, j+1, u, h);
-                    B1 = eval_point(i, j, u, v-h);
-                    //sign *= -1.0f;
-                } else if (yp == res){
-                    B0 = eval_point(i, j, u, v);
-                    B1 = eval_point(i, j, u, v-h);
-                    //sign *= -1.0f;
-                } else {
-                    B0 = eval_point(i,j, u, v+h);
-                    B1 = eval_point(i, j, u, v-h);
-                }
+                // glm::vec3 A0, A1;
+                // glm::vec3 B0, B1;
+                // float sign = -1.0f;
+                // if (xp == res && i < (npx-1)){
+                //     A0 = eval_point(i+1,j, h, v);
+                //     A1 = eval_point(i, j, u-h, v);
+                //     //sign *= -1.0f;
+                // } else if (xp == res){
+                //     A0 = eval_point(i, j, u, v);
+                //     A1 = eval_point(i, j, u-h, v);
+                //     //sign *= -1.0f;
+                // } else {
+                //     A0 = eval_point(i,j, u+h, v);
+                //     A1 = eval_point(i, j, u-h, v);
+                // }
+                // if (yp == res && j < (npy-1)){
+                //     B0 = eval_point(i, j+1, u, h);
+                //     B1 = eval_point(i, j, u, v-h);
+                //     //sign *= -1.0f;
+                // } else if (yp == res){
+                //     B0 = eval_point(i, j, u, v);
+                //     B1 = eval_point(i, j, u, v-h);
+                //     //sign *= -1.0f;
+                // } else {
+                //     B0 = eval_point(i,j, u, v+h);
+                //     B1 = eval_point(i, j, u, v-h);
+                // }
                 //Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                 //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
                 //std::cout << "NA " << glm::to_string(result) << std::endl;
@@ -522,7 +532,7 @@ glm::vec3 HBSurface::get_selected_cp_coords(){
 void HBSurface::select_cp(int idx, bool second, int level){
     if (level <= 0){
         if (is_cp_mine(idx)){
-            std::cout << "running select idx " << idx << std::endl;
+            //std::cout << "running select idx " << idx << std::endl;
             selected = true;
             if (second){
                 sel_idx_2 = idx;
@@ -811,7 +821,6 @@ void HBSurface::split(){
     npatches -= pdim_x * pdim_y; //Needs to be updated when deleting a sub surface.
 
     // Set up the child.
-    has_children = true;
     HBSurface* new_surface = new HBSurface(GLapp, m_shader, b_shader, 2*pdim_x, 2*pdim_y, res);
     *(new_surface->Rcpsx) = RX;
     *(new_surface->Rcpsy) = RY;
@@ -820,6 +829,17 @@ void HBSurface::split(){
     new_surface->parent_sel_cp_j = sel_cp_j;
     new_surface->parent_sel_cp_i_2 = sel_cp_i_2;
     new_surface->parent_sel_cp_j_2 = sel_cp_j_2;
+    if (!has_children){
+        new_surface->colour[0] = colour[0];
+        new_surface->colour[1] = colour[1];
+        new_surface->colour[2] = colour[2];
+    } else {
+        new_surface->colour[0] = child_list[0]->colour[0];
+        new_surface->colour[1] = child_list[0]->colour[1];
+        new_surface->colour[2] = child_list[0]->colour[2];
+    }
+
+    has_children = true;
     new_surface->update_cps();
     *new_surface->cpmask = Eigen::MatrixXi::Constant(dim_x, dim_y, 0);
     //std::cout << *new_surface->cpmask << std::endl;
@@ -833,11 +853,10 @@ void HBSurface::split(){
 
 
     //This for checking patches
-    for (int i = -2; i <= -1 + (i_end-i_start); i++){
-        for (int j = -2; j <= -1 + (j_end - j_start); j++){
-            children[i_start+i][j_start+j] = new_surface;
-        }
-    }
+    (*render_patch).block(sel_cp_i-2, sel_cp_j-2, pdim_x, pdim_y) = Eigen::MatrixXi::Zero(pdim_x, pdim_y);
+
+
+    std::cout << *render_patch << std::endl;
 
     for (std::vector<HBSurface*>::iterator child = adjacent_children.begin(); child != adjacent_children.end(); child++){
         std::cout << "Adding back " << (((*child)->npx)/2) * (((*child)->npy)/2) << " patches." << std::endl;
@@ -855,8 +874,9 @@ void HBSurface::split(){
             }
         }
     }
+
     if (adjacent_exists){
-        npatches++;
+        //npatches++;
     }
 
     std::cout << "Completed Split" << std::endl;

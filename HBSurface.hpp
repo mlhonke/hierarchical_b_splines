@@ -44,6 +44,7 @@ public:
     glm::vec3 get_selected_cp_coords();
     void update_references();
     void set_mode_edit_cp(bool val);
+    void get_colour(int level, std::vector<float *> &col_list);
 
     // Public variables
     int ncpx;
@@ -83,13 +84,14 @@ private:
     glm::vec3 get_ep_col(int idx);
     void gen_vertex_patch(int& elem, int i, int j);
 
+    float* colour;
     std::mutex mtx;
     bool edit_cp_mode = false;
     int my_idx_start = idx_start;
     bool has_parent = false;
     bool has_children = false;
     std::vector<HBSurface*> child_list;
-    HBSurface*** children;
+    Eigen::MatrixXi* render_patch;
     HBSurface* parent;
     bool selected = false;
     int res;
