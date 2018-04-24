@@ -13,8 +13,6 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
         }
     }
 
-    Pbuffer = new glm::vec3[(res+1)*(res+1)];
-    Nbuffer = new glm::vec3[(res+1)*(res+1)];
     npatches = npx*npy;
     int m = npx + k - 2;
     int n = npy + l - 2;
@@ -38,6 +36,8 @@ HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader
     (*Ocpsz) = Eigen::MatrixXf::Zero(ncpx, ncpy);
     cpmask = new Eigen::MatrixXi(ncpx, ncpy);
     *cpmask = Eigen::MatrixXi::Constant(ncpx, ncpy, 1);
+
+    threads = new std::thread[npx*npy];
 
     //std::cout << my_idx_start << std::endl;
     //std::cout << *cps << std::endl;
@@ -116,7 +116,6 @@ void HBSurface::init_render(){
 }
 
 void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking, int level){
-    update_cps();
     if (level <= 0){
         int n_points;
         //CP vertices
@@ -179,7 +178,6 @@ void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool 
 }
 
 void HBSurface::render_surface(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool do_picking){
-    update_cps();
     //Render surface vertices
     glBindVertexArray(m_surface_vao);
 
@@ -307,96 +305,109 @@ glm::vec3* HBSurface::get_vertices(){
     }
 
     //Iterate through the patches
-    float h = 0.001f;
-    int elem = 0;
+    int elem = -6;
     for (int i = 0; i < npx; i++){
     for (int j = 0; j < npy; j++){
         //std::cout << (children[i][j] == this) << std::endl;
-        if (children[i][j] == this){
-            //Iterate in the patch
-            for (int xp = 0; xp <= res; xp++){
-                float u = (float) xp / (float) res;
-                for (int yp = 0; yp <= res; yp++){
-                    float v = (float) yp / (float) res;
-                    glm::vec3 C = eval_point(i, j, u, v);
-                    Pbuffer[fxy(xp, yp)] =  C;
-
-                    //Find the normal
-                    glm::vec3 A0, A1;
-                    glm::vec3 B0, B1;
-                    float sign = -1.0f;
-                    if (xp == res && i < (npx-1)){
-                        A0 = eval_point(i+1,j, h, v);
-                        A1 = eval_point(i, j, u-h, v);
-                        //sign *= -1.0f;
-                    } else if (xp == res){
-                        A0 = eval_point(i, j, u, v);
-                        A1 = eval_point(i, j, u-h, v);
-                        //sign *= -1.0f;
-                    } else {
-                        A0 = eval_point(i,j, u+h, v);
-                        A1 = eval_point(i, j, u-h, v);
-                    }
-                    if (yp == res && j < (npy-1)){
-                        B0 = eval_point(i, j+1, u, h);
-                        B1 = eval_point(i, j, u, v-h);
-                        //sign *= -1.0f;
-                    } else if (yp == res){
-                        B0 = eval_point(i, j, u, v);
-                        B1 = eval_point(i, j, u, v-h);
-                        //sign *= -1.0f;
-                    }else {
-                        B0 = eval_point(i,j, u, v+h);
-                        B1 = eval_point(i, j, u, v-h);
-                    }
-                    Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
-                    //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
-                    //std::cout << "NA " << glm::to_string(result) << std::endl;
-                    //Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
-                    //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
-                }
-            }
-
-            for (int xp = 0; xp < res; xp++){
-                glm::vec3 P0 = Pbuffer[fxy(xp, 0)];
-                glm::vec3 P1 = Pbuffer[fxy(xp+1, 0)];
-                glm::vec3 N0 = Nbuffer[fxy(xp, 0)];
-                glm::vec3 N1 = Nbuffer[fxy(xp+1, 0)];
-                for (int yp = 0; yp < res; yp++){
-                    glm::vec3 P2 = Pbuffer[fxy(xp+1, yp+1)];
-                    glm::vec3 P3 = Pbuffer[fxy(xp, yp+1)];
-                    glm::vec3 N2 = Nbuffer[fxy(xp+1, yp+1)];
-                    glm::vec3 N3 = Nbuffer[fxy(xp, yp+1)];
-
-                    //Find the current square element of the surface (ugly)
-                    //std::cout << P0.x << " " << P0.y << " " << P0.z << std::endl;
-                    vert[elem + 0] = P2;
-                    vert[elem + 1] = P1;
-                    vert[elem + 2] = P0;
-                    vert[elem + 3] = P0;
-                    vert[elem + 4] = P3;
-                    vert[elem + 5] = P2;
-
-                    norm[elem + 0] = N2;
-                    norm[elem + 1] = N1;
-                    norm[elem + 2] = N0;
-                    norm[elem + 3] = N0;
-                    norm[elem + 4] = N3;
-                    norm[elem + 5] = N2;
-
-                    //Shift over a square
-                    P1 = P2;
-                    P0 = P3;
-                    N1 = N2;
-                    N0 = N3;
-                    elem += 6;
-                }
-            }
-        }
+        threads[i*npy + j] = std::thread(&HBSurface::gen_vertex_patch, this, std::ref(elem), i, j);
+        //gen_vertex_patch(elem, i, j);
     }
+    }
+
+    for (int i = 0; i < npx*npy; i++){
+        threads[i].join();
     }
 
     return vert;
+}
+
+void HBSurface::gen_vertex_patch(int& elem, int i, int j){
+    glm::vec3 Pbuffer[(res+1)*(res+1)];
+    glm::vec3 Nbuffer[(res+1)*(res+1)];
+    float h = 0.001f;
+    if (children[i][j] == this){
+        //Iterate in the patch
+        for (int xp = 0; xp <= res; xp++){
+            float u = (float) xp / (float) res;
+            for (int yp = 0; yp <= res; yp++){
+                float v = (float) yp / (float) res;
+                glm::vec3 C = eval_point(i, j, u, v);
+                Pbuffer[fxy(xp, yp)] =  C;
+
+                //Find the normal
+                glm::vec3 A0, A1;
+                glm::vec3 B0, B1;
+                float sign = -1.0f;
+                if (xp == res && i < (npx-1)){
+                    A0 = eval_point(i+1,j, h, v);
+                    A1 = eval_point(i, j, u-h, v);
+                    //sign *= -1.0f;
+                } else if (xp == res){
+                    A0 = eval_point(i, j, u, v);
+                    A1 = eval_point(i, j, u-h, v);
+                    //sign *= -1.0f;
+                } else {
+                    A0 = eval_point(i,j, u+h, v);
+                    A1 = eval_point(i, j, u-h, v);
+                }
+                if (yp == res && j < (npy-1)){
+                    B0 = eval_point(i, j+1, u, h);
+                    B1 = eval_point(i, j, u, v-h);
+                    //sign *= -1.0f;
+                } else if (yp == res){
+                    B0 = eval_point(i, j, u, v);
+                    B1 = eval_point(i, j, u, v-h);
+                    //sign *= -1.0f;
+                } else {
+                    B0 = eval_point(i,j, u, v+h);
+                    B1 = eval_point(i, j, u, v-h);
+                }
+                Nbuffer[fxy(xp, yp)] = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                //glm::vec3 result = sign*glm::normalize(glm::cross(A0-A1, B0-B1));
+                //std::cout << "NA " << glm::to_string(result) << std::endl;
+                //Nbuffer[fxy(xp, yp)] = eval_normal(i, j, u, v);
+                //std::cout << Pbuffer[fxy(xp, yp)].x << std::endl;
+            }
+        }
+        mtx.lock();
+        for (int xp = 0; xp < res; xp++){
+            glm::vec3 P0 = Pbuffer[fxy(xp, 0)];
+            glm::vec3 P1 = Pbuffer[fxy(xp+1, 0)];
+            glm::vec3 N0 = Nbuffer[fxy(xp, 0)];
+            glm::vec3 N1 = Nbuffer[fxy(xp+1, 0)];
+            for (int yp = 0; yp < res; yp++){
+                glm::vec3 P2 = Pbuffer[fxy(xp+1, yp+1)];
+                glm::vec3 P3 = Pbuffer[fxy(xp, yp+1)];
+                glm::vec3 N2 = Nbuffer[fxy(xp+1, yp+1)];
+                glm::vec3 N3 = Nbuffer[fxy(xp, yp+1)];
+
+                elem += 6;
+
+                //Find the current square element of the surface (ugly)
+                //std::cout << P0.x << " " << P0.y << " " << P0.z << std::endl;
+                vert[elem + 0] = P2;
+                vert[elem + 1] = P1;
+                vert[elem + 2] = P0;
+                vert[elem + 3] = P0;
+                vert[elem + 4] = P3;
+                vert[elem + 5] = P2;
+
+                norm[elem + 0] = N2;
+                norm[elem + 1] = N1;
+                norm[elem + 2] = N0;
+                norm[elem + 3] = N0;
+                norm[elem + 4] = N3;
+                norm[elem + 5] = N2;
+
+                //Shift over a square
+                P1 = P2;
+                P0 = P3;
+                N1 = N2;
+                N0 = N3;
+            }
+        }
+        mtx.unlock();
+    }
 }
 
 void HBSurface::set_mode_edit_cp(bool val){

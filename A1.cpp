@@ -174,7 +174,7 @@ mat4 A1::get_W(){
 void A1::draw()
 {
 	//std::cout << "New Render Cycle" << std::endl;
-	glfwSwapInterval(1);
+	glfwSwapInterval(0);
 	// Create a global transformation for the model (centre it).
 	mat4 W;
 	W = get_W();

@@ -8,6 +8,8 @@
 #include "cs488-framework/ShaderProgram.hpp"
 #include "cs488-framework/GlErrorCheck.hpp"
 
+#include <thread>
+#include <mutex>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -79,7 +81,9 @@ private:
     unsigned int get_n_ep_vertices();
     unsigned int get_ep_vertices_size();
     glm::vec3 get_ep_col(int idx);
+    void gen_vertex_patch(int& elem, int i, int j);
 
+    std::mutex mtx;
     bool edit_cp_mode = false;
     int my_idx_start = idx_start;
     bool has_parent = false;
@@ -89,8 +93,9 @@ private:
     HBSurface* parent;
     bool selected = false;
     int res;
-    glm::vec3* Pbuffer;
-    glm::vec3* Nbuffer;
+    //glm::vec3* Pbuffer;
+    //glm::vec3* Nbuffer;
+    std::thread* threads;
     int npatches;
     int sel_cp_i;
     int sel_cp_j;
