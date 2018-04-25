@@ -850,10 +850,11 @@ void HBSurface::split(){
     std::cout << "New surface has " << new_surface->get_n_cps() << " number of cps." << std::endl;
     //std::cout << *new_surface->cpsx << std::endl;
     child_list.push_back(new_surface);
+    //update_references();
 
 
     //This for checking patches
-    (*render_patch).block(sel_cp_i-2, sel_cp_j-2, pdim_x, pdim_y) = Eigen::MatrixXi::Zero(pdim_x, pdim_y);
+    (*render_patch).block(i_start-2, j_start-2, pdim_x, pdim_y) = Eigen::MatrixXi::Zero(pdim_x, pdim_y);
 
 
     std::cout << *render_patch << std::endl;
@@ -867,6 +868,21 @@ void HBSurface::split(){
         (*new_surface->Ocpsx).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsx;
         (*new_surface->Ocpsy).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsy;
         (*new_surface->Ocpsz).block(i, j, (*child)->ncpx, (*child)->ncpy) = *(*child)->Ocpsz;
+        int x = (*child)->parent_sel_cp_i - new_surface->parent_sel_cp_i;
+        int y = (*child)->parent_sel_cp_j - new_surface->parent_sel_cp_j;
+        (*new_surface->render_patch).block(2*x, 2*y, (*child)->npx, (*child)->npy) = *(*child)->render_patch;
+        new_surface->update_cps();
+
+        for (std::vector<HBSurface*>::iterator childc = (*child)->child_list.begin(); childc != (*child)->child_list.end(); childc++){
+            new_surface->has_children = true;
+            (*childc)->parent_sel_cp_i += 2*((*childc)->parent->parent_sel_cp_i - new_surface->parent_sel_cp_i);
+            (*childc)->parent_sel_cp_j += 2*((*childc)->parent->parent_sel_cp_j - new_surface->parent_sel_cp_j);
+            (*childc)->parent_sel_cp_i_2 += 2*((*childc)->parent->parent_sel_cp_i - new_surface->parent_sel_cp_i);
+            (*childc)->parent_sel_cp_j_2 += 2*((*childc)->parent->parent_sel_cp_j - new_surface->parent_sel_cp_j);
+
+            new_surface->child_list.push_back(*childc);
+            (*childc)->parent = new_surface;
+        }
 
         for (std::vector<HBSurface*>::iterator childp = child_list.begin(); childp != child_list.end(); childp++){
             if( *childp == *child ){
@@ -875,10 +891,7 @@ void HBSurface::split(){
         }
     }
 
-    if (adjacent_exists){
-        //npatches++;
-    }
-
+    update_references();
     std::cout << "Completed Split" << std::endl;
     // std::cout << RX << std::endl << std::endl;
     // std::cout << RZ << std::endl << std::endl;

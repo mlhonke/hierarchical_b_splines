@@ -4,6 +4,8 @@
 #include <iostream>
 #include <algorithm>
 #include <math.h>
+#include <string>
+#include <fstream>
 
 #include <imgui/imgui.h>
 #include <glm/glm.hpp>
@@ -66,7 +68,7 @@ void A1::init()
 	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, 16);
 	//Center the surface.
 	W_trans_center = glm::translate(W_trans_center, vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
-	W_trans = glm::translate(W_trans, vec3(0.0f, 0.0f, - 8.0f));
+	W_trans_init = glm::translate(W_trans, vec3(0.0f, 0.0f, - 8.0f));
 	update_W();
 	// Set up initial view and projection matrices (need to do this here,
 	// since it depends on the GLFW window being set up correctly).
@@ -79,6 +81,19 @@ void A1::init()
 		glm::radians( 45.0f ),
 		float( m_framebufferWidth ) / float( m_framebufferHeight ),
 		0.1f, 10000.0f );
+}
+
+void A1::save(){
+
+}
+
+template<typename Derived>
+void A1::write_matrix(std::ofstream output_file, const Eigen::MatrixBase<Derived>& M){
+	output_file << M << std::endl;
+}
+
+void A1::load_matrix(){
+
 }
 
 void A1::updateLighting(){
@@ -138,6 +153,9 @@ void A1::guiLogic()
 			ImGui::Text( "Control Point Level: All");
 		}
 
+		if( ImGui::Button( "Save" ) ) {
+			save();
+		}
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 		}
@@ -178,7 +196,7 @@ mat4 A1::update_W(){
 	//std::cout << glm::to_string(W_rot) << std::endl;
 	W_scale = glm::scale(glm::mat4(), vec3(zoom, zoom, zoom));
 	//std::cout << glm::to_string(W) << std::endl;
-	W = W_trans*W_rot*W_scale*W_trans_center;
+	W = W_trans_init*W_trans*W_rot*W_scale*W_trans_center;
 
 	return W;
 }
@@ -196,7 +214,9 @@ void A1::draw()
 	updateLighting();
 
 	surface->render_points(W, proj, view, do_picking, level);
-	surface->render_surface(W, proj, view, do_picking);
+	if(!hide_surface){
+		surface->render_surface(W, proj, view, do_picking);
+	}
 
 	// Restore defaults
 	glBindVertexArray( 0 );
@@ -287,11 +307,18 @@ bool A1::mouseMoveEvent(double xPos, double yPos)
 			surface->move_selected_cp(delta_model);
 			old_x = xPos;
 			old_y = yPos;
+		} else if (dragging_right){
+			glm::vec3 delta;
+			delta.x = 0.01f*(xPos - old_x);
+			delta.y = -0.01f*(yPos - old_y);
+			W_trans = glm::translate(W_trans_old, delta);
+			update_W();
 		} else {
 		// Track the position of the mouse in preparation for rotation.
 			old_x = xPos;
 			old_y = yPos;
 			W_rot_old = W_rot;
+			W_trans_old = W_trans;
 		}
 	}
 	return eventHandled;
@@ -366,6 +393,12 @@ bool A1::mouseButtonInputEvent(int button, int actions, int mods) {
 			old_rot_rads = rot_rads;
 			drag_x = 0;
 			drag_y = 0;
+		}
+		if (button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_PRESS){
+			dragging_right = true;
+		}
+		if (button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_RELEASE){
+			dragging_right = false;
 		}
 	}
 
@@ -457,6 +490,11 @@ bool A1::keyInputEvent(int key, int action, int mods) {
 
 		if (key == GLFW_KEY_LEFT_CONTROL){
 			lctrl = true;
+			eventHandled = true;
+		}
+
+		if (key == GLFW_KEY_LEFT_SHIFT){
+			hide_surface = !hide_surface;
 			eventHandled = true;
 		}
 

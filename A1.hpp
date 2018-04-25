@@ -7,7 +7,9 @@
 #include "cs488-framework/OpenGLImport.hpp"
 #include "cs488-framework/ShaderProgram.hpp"
 
+#include "Eigen/Dense"
 #include "trackball.hpp"
+#include <fstream>
 
 class HBSurface;
 
@@ -47,12 +49,23 @@ private:
 	glm::mat4 W_rot;
 	glm::mat4 W_rot_old;
 	glm::mat4 W_trans;
+	glm::mat4 W_trans_init;
+	glm::mat4 W_trans_old;
 	glm::mat4 W_trans_center;
 	glm::mat4 W_scale;
+
+	//Saving/loading variables
+	template<typename Derived>
+	void write_matrix(std::ofstream output_file, const Eigen::MatrixBase<Derived>& M);
+	void load_matrix();
+	void save();
+	std::fstream save_file;
+
 
 	//Fields for object picking
 	bool do_picking = false;
 	bool lctrl = false;
+	bool hide_surface = false;
 
 	// Fields related to surface properties
 	int npx = 8;
@@ -77,6 +90,7 @@ private:
 
 	// Fields related to movement.
 	bool dragging = false;
+	bool dragging_right = false;
 	float old_x = 0;
 	float old_y = 0;
 	float rot_rads = 0.0f;
