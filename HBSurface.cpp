@@ -1,7 +1,39 @@
 #include "HBSurface.hpp"
 #include "A1.hpp"
 
+template<typename Derived>
+void write_matrix(std::ofstream& output_file, const Eigen::MatrixBase<Derived>& M){
+	output_file << M << std::endl;
+}
+
+template<typename Derived>
+void load_matrix(std::ifstream& input_file, Eigen::MatrixBase<Derived>& M){
+    std::string linein;
+    float temp;
+    for (int i = 0; i < M.rows(); i++) {
+        for (int j = 0; j < M.cols(); j++){
+            input_file >> temp;
+            M(i,j) = temp;
+        }
+    }
+}
+
 int HBSurface::idx_start = 0;
+
+void HBSurface::save(std::ofstream& save_file, int level){
+    write_matrix(save_file, *Ocpsx);
+    write_matrix(save_file, *Ocpsy);
+    write_matrix(save_file, *Ocpsz);
+    save_file << colour[0] << " " << colour[1] << " " << colour[2] << std::endl;
+}
+
+void HBSurface::load(std::ifstream& load_file, int level){
+    load_matrix(load_file, *Ocpsx);
+    load_matrix(load_file, *Ocpsy);
+    load_matrix(load_file, *Ocpsz);
+    load_file >> colour[0] >> colour[1] >> colour[2];
+    update_cps();
+}
 
 HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader, int npx, int npy, int res)
     : npx(npx), npy(npy), res(res), GLapp(GLapp), m_shader(m_shader), b_shader(b_shader){

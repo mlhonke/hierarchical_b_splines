@@ -11,6 +11,8 @@
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <vector>
 #include <cmath>
 #include "Eigen/Dense"
@@ -45,12 +47,15 @@ public:
     void update_references();
     void set_mode_edit_cp(bool val);
     void get_colour(int level, std::vector<float *> &col_list);
+    void save(std::ofstream& file_name, int level);
+    void load(std::ifstream& file_name, int level);
 
     // Public variables
     int ncpx;
     int ncpy;
     int npx;
     int npy;
+    int res;
     Eigen::MatrixXf* Ocpsx;
     Eigen::MatrixXf* Ocpsy;
     Eigen::MatrixXf* Ocpsz;
@@ -94,7 +99,6 @@ private:
     Eigen::MatrixXi* render_patch;
     HBSurface* parent;
     bool selected = false;
-    int res;
     //glm::vec3* Pbuffer;
     //glm::vec3* Nbuffer;
     std::thread* threads;

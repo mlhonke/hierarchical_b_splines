@@ -9,7 +9,6 @@
 
 #include "Eigen/Dense"
 #include "trackball.hpp"
-#include <fstream>
 
 class HBSurface;
 
@@ -41,6 +40,10 @@ private:
 	int pick_object();
 	glm::vec3 GetOGLPos(float x, float y, float depth);
 	float getDepth(float x, float y);
+	void new_prog();
+	void save();
+	void load();
+
 	float depth_val;
 	bool depth_set = false;
 	bool drag_cp = false;
@@ -55,12 +58,7 @@ private:
 	glm::mat4 W_scale;
 
 	//Saving/loading variables
-	template<typename Derived>
-	void write_matrix(std::ofstream output_file, const Eigen::MatrixBase<Derived>& M);
-	void load_matrix();
-	void save();
-	std::fstream save_file;
-
+	bool surface_exists = false;
 
 	//Fields for object picking
 	bool do_picking = false;
@@ -71,6 +69,7 @@ private:
 	int npx = 4;
 	int npy = 4;
 	int level = -1;
+	int res = 16;
 
 	// Fields related to the shader and uniforms.
 	ShaderProgram m_shader;

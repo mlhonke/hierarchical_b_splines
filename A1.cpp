@@ -65,7 +65,7 @@ void A1::init()
 	light_colour = m_shader.getUniformLocation("light.rgbIntensity");
 	light_ambient = m_shader.getUniformLocation("ambientIntensity");
 
-	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, 16);
+	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, res);
 	//Center the surface.
 	W_trans_center = glm::translate(W_trans_center, vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
 	W_trans_init = glm::translate(W_trans, vec3(0.0f, 0.0f, - 8.0f));
@@ -83,17 +83,47 @@ void A1::init()
 		0.1f, 10000.0f );
 }
 
+void A1::new_prog(){
+	std::cout << "Enter x patches: ";
+	std::cin >> npx;
+	std::cout << "Enter y patches: ";
+	std::cin >> npy;
+	std::cout << "Enter patch resolution: ";
+	std::cin >> res;
+	delete surface;
+	HBSurface::idx_start = 0;
+	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, res);
+	W_trans_center = glm::translate(glm::mat4(), vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
+	update_W();
+}
+
 void A1::save(){
-
+	std::string file_name;
+	std::cout << "Enter save name: ";
+	std::cin >> file_name;
+	std::ofstream save_file;
+	save_file.open(file_name);
+	save_file << surface->npx << std::endl;
+	save_file << surface->npy << std::endl;
+	save_file << surface->res << std::endl;
+	surface->save(save_file, 0);
 }
 
-template<typename Derived>
-void A1::write_matrix(std::ofstream output_file, const Eigen::MatrixBase<Derived>& M){
-	output_file << M << std::endl;
-}
-
-void A1::load_matrix(){
-
+void A1::load(){
+	std::string file_name;
+	std::cout << "Enter a filename to load: ";
+	std::cin >> file_name;
+	std::ifstream load_file;
+	load_file.open(file_name);
+	delete surface;
+	HBSurface::idx_start = 0;
+	load_file >> npx;
+	load_file >> npy;
+	load_file >> res;
+	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, res);
+	surface->load(load_file, 0);
+	W_trans_center = glm::translate(glm::mat4(), vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
+	update_W();
 }
 
 void A1::updateLighting(){
@@ -153,8 +183,16 @@ void A1::guiLogic()
 			ImGui::Text( "Control Point Level: All");
 		}
 
+		if (ImGui::Button( "New")){
+			new_prog();
+		}
+		ImGui::SameLine();
 		if( ImGui::Button( "Save" ) ) {
 			save();
+		}
+		ImGui::SameLine();
+		if( ImGui::Button( "Load" ) ) {
+			load();
 		}
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
