@@ -102,11 +102,10 @@ void A1::save(){
 	std::cout << "Enter save name: ";
 	std::cin >> file_name;
 	std::ofstream save_file;
-	save_file.open(file_name);
-	save_file << surface->npx << std::endl;
-	save_file << surface->npy << std::endl;
-	save_file << surface->res << std::endl;
-	surface->save(save_file, 0);
+	std::string file_name_ext = file_name;
+	file_name_ext.append(".txt");
+	save_file.open(file_name_ext);
+	surface->save(save_file, file_name, 0);
 }
 
 void A1::load(){
@@ -114,14 +113,16 @@ void A1::load(){
 	std::cout << "Enter a filename to load: ";
 	std::cin >> file_name;
 	std::ifstream load_file;
-	load_file.open(file_name);
+	std::string file_name_ext = file_name;
+	file_name_ext.append(".txt");
+	load_file.open(file_name_ext);
 	delete surface;
 	HBSurface::idx_start = 0;
 	load_file >> npx;
 	load_file >> npy;
 	load_file >> res;
 	surface = new HBSurface(this, &m_shader, &b_shader, npx, npy, res);
-	surface->load(load_file, 0);
+	surface->load(load_file, file_name, 0);
 	W_trans_center = glm::translate(glm::mat4(), vec3(- (surface->ncpx-1.0f)/2.0f, 0.0f, - (surface->ncpy-1.0f)/2.0f));
 	update_W();
 }

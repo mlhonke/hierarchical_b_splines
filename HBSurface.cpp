@@ -20,19 +20,75 @@ void load_matrix(std::ifstream& input_file, Eigen::MatrixBase<Derived>& M){
 
 int HBSurface::idx_start = 0;
 
-void HBSurface::save(std::ofstream& save_file, int level){
+void HBSurface::save(std::ofstream& save_file, std::string file_name, int level){
+    std::cout << "Saving..." << std::endl;
+    save_file << npx << std::endl;
+    save_file << npy << std::endl;
+    save_file << res << std::endl;
     write_matrix(save_file, *Ocpsx);
     write_matrix(save_file, *Ocpsy);
     write_matrix(save_file, *Ocpsz);
+    write_matrix(save_file, *cpmask);
+    write_matrix(save_file, *render_patch);
     save_file << colour[0] << " " << colour[1] << " " << colour[2] << std::endl;
+    save_file << parent_sel_cp_i_2 << " " << parent_sel_cp_j_2 << " " << parent_sel_cp_j << " " << parent_sel_cp_i << std::endl;
+    save_file << has_children << std::endl;
+    save_file << has_parent << std::endl;
+    save_file << child_list.size() << std::endl;
+    save_file << npatches << std::endl;
+
+    int i = 0;
+    for (std::vector<HBSurface*>::iterator child = child_list.begin(); child != child_list.end(); child++){
+        std::string cfile_name = file_name;
+        cfile_name.append(std::to_string(i));
+        std::ofstream csave_file;
+        std::string file_name_ext = cfile_name;
+        file_name_ext.append(".txt");
+        csave_file.open(file_name_ext);
+        (*child)->save(csave_file, cfile_name, level+1);
+        csave_file.close();
+        i++;
+    }
+
+    save_file.close();
 }
 
-void HBSurface::load(std::ifstream& load_file, int level){
+void HBSurface::load(std::ifstream& load_file, std::string file_name, int level){
+    std::cout << "Loading..." << std::endl;
     load_matrix(load_file, *Ocpsx);
     load_matrix(load_file, *Ocpsy);
     load_matrix(load_file, *Ocpsz);
+    load_matrix(load_file, *cpmask);
+    load_matrix(load_file, *render_patch);
     load_file >> colour[0] >> colour[1] >> colour[2];
+    load_file >> parent_sel_cp_i_2 >> parent_sel_cp_j_2 >> parent_sel_cp_j >> parent_sel_cp_i;
+    load_file >> has_children;
+    load_file >> has_parent;
+    int n_children;
+    load_file >> n_children;
+    load_file >> npatches;
     update_cps();
+
+    for (int i = 0; i < n_children; i++){
+        std::string cfile_name = file_name;
+        cfile_name.append(std::to_string(i));
+        std::ifstream cload_file;
+        std::string file_name_ext = cfile_name;
+        file_name_ext.append(".txt");
+        cload_file.open(file_name_ext);
+        int cnpx, cnpy, cres;
+        cload_file >> cnpx;
+        cload_file >> cnpy;
+        cload_file >> cres;
+        HBSurface* child = new HBSurface(GLapp, m_shader, b_shader, cnpx, cnpy, cres);
+        child->load(cload_file, cfile_name, level+1);
+        cload_file.close();
+        child->parent = this;
+        child_list.push_back(child);
+    }
+
+    load_file.close();
+    update_references();
 }
 
 HBSurface::HBSurface(A1* GLapp, ShaderProgram* m_shader, ShaderProgram* b_shader, int npx, int npy, int res)
@@ -894,6 +950,7 @@ void HBSurface::split(){
     for (std::vector<HBSurface*>::iterator child = adjacent_children.begin(); child != adjacent_children.end(); child++){
         std::cout << "Adding back " << (((*child)->npx)/2) * (((*child)->npy)/2) << " patches." << std::endl;
         npatches += (((*child)->npx)/2) * (((*child)->npy)/2);
+        std::cout << "Current number of patches to render for parent surface " << npatches << std::endl;
         int i = 2*((*child)->parent_sel_cp_i - new_surface->parent_sel_cp_i);
         int j = 2*((*child)->parent_sel_cp_j - new_surface->parent_sel_cp_j);
 
@@ -904,6 +961,7 @@ void HBSurface::split(){
         int y = (*child)->parent_sel_cp_j - new_surface->parent_sel_cp_j;
         (*new_surface->render_patch).block(2*x, 2*y, (*child)->npx, (*child)->npy) = *(*child)->render_patch;
         new_surface->update_cps();
+        new_surface->npatches -= (*child)->npx * (*child)->npy - (*child)->npatches;
 
         for (std::vector<HBSurface*>::iterator childc = (*child)->child_list.begin(); childc != (*child)->child_list.end(); childc++){
             new_surface->has_children = true;

@@ -47,8 +47,8 @@ public:
     void update_references();
     void set_mode_edit_cp(bool val);
     void get_colour(int level, std::vector<float *> &col_list);
-    void save(std::ofstream& file_name, int level);
-    void load(std::ifstream& file_name, int level);
+    void save(std::ofstream& save_file, std::string file_name, int level);
+    void load(std::ifstream& load_file, std::string file_name, int level);
 
     // Public variables
     int ncpx;
