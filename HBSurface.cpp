@@ -796,15 +796,15 @@ void HBSurface::split(){
 
     if( adjacent_exists){
         std::cout << "Creating new combined surface " << min_ci << "," << min_cj << " to " << max_ci << "," << max_cj << std::endl;
-        sel_cp_i = min_ci;
-        sel_cp_j = min_cj;
-        sel_cp_i_2 = max_ci;
-        sel_cp_j_2 = max_cj;
+        i_start = min_ci;
+        j_start = min_cj;
+        i_end = max_ci;
+        j_end = max_cj;
     }
 
     int dim_x, dim_y;
-    dim_x = 7 + std::abs(sel_cp_i - sel_cp_i_2)*2;
-    dim_y = 7 + std::abs(sel_cp_j - sel_cp_j_2)*2;
+    dim_x = 7 + std::abs(i_end - i_start)*2;
+    dim_y = 7 + std::abs(j_end - j_start)*2;
 
     std::cout << "Adding new surface." << std::endl;
     std::cout << "Dim " << dim_x << " by " << dim_y << " control points." << std::endl;
@@ -813,10 +813,10 @@ void HBSurface::split(){
     Eigen::MatrixXf RY(dim_x, dim_y);
     Eigen::MatrixXf RZ(dim_x, dim_y);
 
-    get_split_reference(RX, RY, RZ, sel_cp_i, sel_cp_j, sel_cp_i_2, sel_cp_j_2);
+    get_split_reference(RX, RY, RZ, i_start, j_start, i_end, j_end);
 
-    int pdim_x = std::abs(sel_cp_i - sel_cp_i_2)+2;
-    int pdim_y = std::abs(sel_cp_j - sel_cp_j_2)+2;
+    int pdim_x = std::abs(i_end - i_start)+2;
+    int pdim_y = std::abs(j_end - j_start)+2;
     std::cout << "Dim " << pdim_x << " by " << pdim_y << " patches." << std::endl;
     npatches -= pdim_x * pdim_y; //Needs to be updated when deleting a sub surface.
 
@@ -825,10 +825,10 @@ void HBSurface::split(){
     *(new_surface->Rcpsx) = RX;
     *(new_surface->Rcpsy) = RY;
     *(new_surface->Rcpsz) = RZ;
-    new_surface->parent_sel_cp_i = sel_cp_i;
-    new_surface->parent_sel_cp_j = sel_cp_j;
-    new_surface->parent_sel_cp_i_2 = sel_cp_i_2;
-    new_surface->parent_sel_cp_j_2 = sel_cp_j_2;
+    new_surface->parent_sel_cp_i = i_start;
+    new_surface->parent_sel_cp_j = j_start;
+    new_surface->parent_sel_cp_i_2 = i_end;
+    new_surface->parent_sel_cp_j_2 = j_end;
     if (!has_children){
         new_surface->colour[0] = colour[0];
         new_surface->colour[1] = colour[1];

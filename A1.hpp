@@ -68,8 +68,8 @@ private:
 	bool hide_surface = false;
 
 	// Fields related to surface properties
-	int npx = 8;
-	int npy = 8;
+	int npx = 4;
+	int npy = 4;
 	int level = -1;
 
 	// Fields related to the shader and uniforms.
