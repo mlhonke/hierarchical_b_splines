@@ -243,7 +243,7 @@ void HBSurface::render_points(glm::mat4 W, glm::mat4 proj, glm::mat4 view, bool 
             } else {
                 for (int idx = my_idx_start; idx < (n_points + my_idx_start); idx++){
                     glm::vec3 cp_col;
-                    if (edit_cp_mode && level == 0){
+                    if (edit_cp_mode){
                         cp_col = get_ep_col(idx);
                     } else {
                         cp_col = get_cp_col(idx);
@@ -673,6 +673,7 @@ void HBSurface::move_selected_cp(glm::vec3 delta){
                 (*Ocpsx)(i, j) = D.x - (*Rcpsx)(i, j);
                 (*Ocpsy)(i, j) = D.y - (*Rcpsy)(i, j);
                 (*Ocpsz)(i, j) = D.z - (*Rcpsz)(i, j);
+                update_cps();
             }
         } else {
             if ( glm::length(delta) < 1000  && ((*cpmask)(sel_cp_i, sel_cp_j) == 1) ){

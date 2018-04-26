@@ -46,7 +46,7 @@ void A1::gen_buffers(GLuint* vaos, GLuint* vbos){
 void A1::init()
 {
 	// Set the background colour.
-	glClearColor( 0.3, 0.5, 0.7, 1.0 );
+	glClearColor(0.35, 0.35, 0.35, 1.0);
 
 	// Build the shader
 	m_shader.generateProgramObject();
@@ -198,9 +198,6 @@ void A1::guiLogic()
 		if( ImGui::Button( "Quit Application" ) ) {
 			glfwSetWindowShouldClose(m_window, GL_TRUE);
 		}
-		if( ImGui::Button( "Restart" ) ) {
-			restart_app();
-		}
 /*
 		// For convenience, you can uncomment this to show ImGui's massive
 		// demonstration window right in your application.  Very handy for
@@ -211,7 +208,7 @@ void A1::guiLogic()
 		}
 */
 
-		ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
+		//ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
 	ImGui::End();
 
